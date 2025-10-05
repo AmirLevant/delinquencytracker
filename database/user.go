@@ -1,9 +1,9 @@
 package database
 
 type Person struct {
-	name      string
-	email     string
-	phone     string
-	totalLoan float64
-	loanId    string
+	name   string
+	email  string
+	phone  string
+	loanId string
+	loan   Loan
 }
