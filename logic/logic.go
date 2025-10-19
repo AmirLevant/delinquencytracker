@@ -23,6 +23,3 @@ func CreateUser(db *sql.DB, name, email, phone string) (int64, error) {
 
 	return userID, nil
 }
-func main() {
-
-}
