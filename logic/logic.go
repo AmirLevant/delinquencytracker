@@ -10,7 +10,7 @@ import (
 func CreateUser(db *sql.DB, name, email, phone string) (int64, error) {
 	query := `
 	INSERT INTO users (name, email, phone)
-	VALUES (1$, 2$, 3$)
+	VALUES ($1, $2, $3)
 	RETURNING id
 	`
 

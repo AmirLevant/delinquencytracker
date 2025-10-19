@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/amirlevant/delinquencytracker/dbconnection"
+	"github.com/amirlevant/delinquencytracker/logic"
 )
 
 func main() {
@@ -30,4 +31,12 @@ func main() {
 	fmt.Println("Success! connected to the database")
 	fmt.Println("Database: loan_tracker")
 	fmt.Println("Host: localhost:5432")
+	fmt.Println()
+
+	userID, err := logic.CreateUser(db, "Sebastian Ibanez", "sebbywebby@example.com", "+1-416-444-4544")
+	if err != nil {
+		log.Fatalf("Failed to create user: %v", err)
+	}
+
+	fmt.Printf("User has been created successfully. User ID: %d", userID)
 }
