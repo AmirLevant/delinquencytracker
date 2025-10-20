@@ -1,8 +1,8 @@
-package definitions
+package delinquencytracker
 
 import "time"
 
-type Payment struct {
+type payment struct {
 	ID            int64      // unique identifier for the payment
 	LoanID        int64      // which loan is this payment for
 	PaymentNumber int        // sequential counter (1st, 2nd, 3rd payment, etc.)
