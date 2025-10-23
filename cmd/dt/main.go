@@ -5,8 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/amirlevant/delinquencytracker/dbconnection"
-	"github.com/amirlevant/delinquencytracker/logic"
+	"github.com/amirlevant/delinquencytracker"
 )
 
 func main() {
@@ -14,7 +13,7 @@ func main() {
 	var printy string = currentTime.Format(time.DateOnly)
 	fmt.Println("the date is ", printy)
 
-	config := dbconnection.DBConfig{
+	config := delinquencytracker.DBConfig{
 		Host:     "localhost",
 		Port:     5432,
 		User:     "postgres",
