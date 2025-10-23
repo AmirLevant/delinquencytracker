@@ -163,3 +163,21 @@ func DeleteUser(db *sql.DB, userID int64) error {
 	return nil
 
 }
+
+func CreateLoan(db *sql.DB, userID int64, totalAmount, interestRate float64, termMonths, dayDue int, status string, dateTaken time.Time) (loan, error) {
+	query := `
+        INSERT INTO loans (user_id, total_amount, interest_rate, term_months, day_due, status, date_taken)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, created_at
+    `
+	var loanID int64
+	var createdAt time.Time
+
+	err := db.QueryRow(query, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken).Scan(&loanID, &createdAt)
+	if err != nil {
+		return loan{}, fmt.Errorf("failed to create loan: %w", err)
+	}
+
+	ln := loan{loanID, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken, createdAt, nil}
+	return ln, nil
+}

@@ -3,6 +3,7 @@ package delinquencytracker
 import (
 	"database/sql"
 	"testing"
+	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -202,4 +203,50 @@ func TestDeleteUser(t *testing.T) {
 	}
 	require.Equal(t, user{}, deletedUsr, "User has been deleted and not found")
 
+}
+
+// 23/10/25 create test for CreateLoan
+// expecting to create a loan for a user and verify all fields are set correctly
+func TestCreateLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Act, creating a loan for this user
+	dateTaken := time.Now()
+	ln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 36, 15, "active", dateTaken)
+
+	// Assert, loan creation should succeed
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+	if ln.ID == 0 {
+		t.Error("Expected loan ID to be set")
+	}
+	if ln.UserID != usr.ID {
+		t.Errorf("Expected UserID %d, got %d", usr.ID, ln.UserID)
+	}
+	if ln.TotalAmount != 10000.00 {
+		t.Errorf("Expected TotalAmount 10000.00, got %f", ln.TotalAmount)
+	}
+	if ln.InterestRate != 0.05 {
+		t.Errorf("Expected InterestRate 0.05, got %f", ln.InterestRate)
+	}
+	if ln.TermMonths != 36 {
+		t.Errorf("Expected TermMonths 36, got %d", ln.TermMonths)
+	}
+	if ln.DayDue != 15 {
+		t.Errorf("Expected DayDue 15, got %d", ln.DayDue)
+	}
+	if ln.Status != "active" {
+		t.Errorf("Expected Status 'active', got '%s'", ln.Status)
+	}
+	if ln.CreatedAt.IsZero() {
+		t.Error("Expected CreatedAt to be set")
+	}
 }
