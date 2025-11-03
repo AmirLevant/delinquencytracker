@@ -182,6 +182,30 @@ func CreateLoan(db *sql.DB, userID int64, totalAmount, interestRate float64, ter
 	return ln, nil
 }
 
+func UpdateLoan(db *sql.DB, loanID int64, totalAmount, interestRate float64, termMonths, dayDue int, status string, dateTaken time.Time) error {
+	query := `
+		UPDATE loans
+		SET total_amount = $1, interest_rate = $2, term_months = $3, day_due = $4, status = $5, date_taken = $6
+		WHERE id = $7
+	`
+
+	result, err := db.Exec(query, totalAmount, interestRate, termMonths, dayDue, status, dateTaken, loanID)
+	if err != nil {
+		return fmt.Errorf("failed to update loan: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("loan with ID %d not found", loanID)
+	}
+
+	return nil
+}
+
 func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 	query :=
 		`
