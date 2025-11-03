@@ -251,6 +251,70 @@ func TestCreateLoan(t *testing.T) {
 	}
 }
 
+func TestUpdateLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange
+	// Creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Creating a loan for this user
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+	ln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 36, 15, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Act
+	// Updating the loan with new values
+	newDateTaken := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -30) // 30 days ago
+	err = UpdateLoan(db, ln.ID, 15000.00, 0.08, 48, 20, "refinanced", newDateTaken)
+
+	// Assert
+	// Update should succeed
+	if err != nil {
+		t.Fatalf("UpdateLoan failed: %v", err)
+	}
+
+	// Ensuring the update worked by querying the loans
+	loans, err := GetLoansByUserID(db, usr.ID)
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+
+	// Should have exactly one loan
+	if len(loans) != 1 {
+		t.Fatalf("Expected 1 loan, got %d", len(loans))
+	}
+
+	updatedLoan := loans[0]
+
+	// Ensuring the updated loan has the new values
+	if updatedLoan.TotalAmount != 15000.00 {
+		t.Errorf("Expected TotalAmount 15000.00, got %f", updatedLoan.TotalAmount)
+	}
+	if updatedLoan.InterestRate != 0.08 {
+		t.Errorf("Expected InterestRate 0.08, got %f", updatedLoan.InterestRate)
+	}
+	if updatedLoan.TermMonths != 48 {
+		t.Errorf("Expected TermMonths 48, got %d", updatedLoan.TermMonths)
+	}
+	if updatedLoan.DayDue != 20 {
+		t.Errorf("Expected DayDue 20, got %d", updatedLoan.DayDue)
+	}
+	if updatedLoan.Status != "refinanced" {
+		t.Errorf("Expected Status 'refinanced', got '%s'", updatedLoan.Status)
+	}
+	// Verify DateTaken was updated (comparing truncated dates)
+	if !updatedLoan.DateTaken.Equal(newDateTaken) {
+		t.Errorf("Expected DateTaken %v, got %v", newDateTaken, updatedLoan.DateTaken)
+	}
+}
+
 func TestGetLoansByUserID_OneLoan(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
