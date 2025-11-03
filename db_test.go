@@ -2,7 +2,6 @@ package delinquencytracker
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 	"time"
 
@@ -304,8 +303,6 @@ func TestGetLoansByUserID_OneLoan(t *testing.T) {
 		t.Error("Expected CreatedAt to be set")
 	}
 
-	fmt.Println(actualLn)
-
 }
 
 func TestGetLoansByUserID_MultiLoan(t *testing.T) {
@@ -348,5 +345,29 @@ func TestGetLoansByUserID_MultiLoan(t *testing.T) {
 	var expectedLoans = []loan{expectedln1, expectedln2, expectedln3}
 
 	require.Equal(t, expectedLoans, actualLoans)
+
+}
+
+func TestGetLoansByUserID_NoLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Act, no loan for this user
+
+	actualLoans, err := GetLoansByUserID(db, usr.ID)
+
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+
+	// when comparing actualLoans to an expectedLoans there is an issue since GetLoansByUserID()
+	// initializes a slice with nils, which is why it is different
+	require.Empty(t, actualLoans)
 
 }
