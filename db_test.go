@@ -307,3 +307,46 @@ func TestGetLoansByUserID_OneLoan(t *testing.T) {
 	fmt.Println(actualLn)
 
 }
+
+func TestGetLoansByUserID_MultiLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Act, creating a loan for this user
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	expectedln1, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	expectedln2, err := CreateLoan(db, usr.ID, 20000.00, 0.25, 26, 15, "paid_off", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	expectedln3, err := CreateLoan(db, usr.ID, 30000.00, 0.35, 36, 25, "defaulted", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Act, we query all the loans that belong to the userID
+	actualLoans, err := GetLoansByUserID(db, usr.ID)
+
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+
+	var expectedLoans = []loan{expectedln1, expectedln2, expectedln3}
+
+	require.Equal(t, expectedLoans, actualLoans)
+
+}

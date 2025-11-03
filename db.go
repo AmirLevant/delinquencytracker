@@ -178,7 +178,7 @@ func CreateLoan(db *sql.DB, userID int64, totalAmount, interestRate float64, ter
 		return loan{}, fmt.Errorf("failed to create loan: %w", err)
 	}
 
-	ln := loan{loanID, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken, createdAt, nil}
+	ln := loan{loanID, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken.UTC(), createdAt.UTC(), nil}
 	return ln, nil
 }
 
@@ -188,6 +188,7 @@ func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
 	FROM loans 
 	WHERE user_id = $1
+	ORDER BY id 
 	`
 
 	rows, err := db.Query(query, userID)
@@ -218,6 +219,8 @@ func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 			return []loan{}, fmt.Errorf("failed to scan loan row: %w", err)
 		}
 
+		l.DateTaken = l.DateTaken.UTC()
+		l.CreatedAt = l.CreatedAt.UTC()
 		loans = append(loans, l) // we add l to loans
 	}
 
