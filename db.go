@@ -232,3 +232,49 @@ func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 	return loans, nil
 
 }
+
+func GetAllLoans(db *sql.DB) ([]loan, error) {
+	query :=
+		`
+	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
+	FROM loans 
+	ORDER BY id 
+	`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var loans []loan
+
+	for rows.Next() {
+		var ln loan
+
+		err := rows.Scan(
+			&ln.ID,
+			&ln.UserID,
+			&ln.TotalAmount,
+			&ln.InterestRate,
+			&ln.TermMonths,
+			&ln.DayDue,
+			&ln.Status,
+			&ln.DateTaken,
+			&ln.CreatedAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+		ln.DateTaken = ln.DateTaken.UTC()
+		ln.CreatedAt = ln.CreatedAt.UTC()
+
+		loans = append(loans, ln)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return loans, nil
+}
