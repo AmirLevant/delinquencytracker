@@ -485,3 +485,35 @@ func TestGetAllLoans(t *testing.T) {
 	require.Equal(t, expectedLoans, actualLoans)
 
 }
+
+func TestDeleteLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// Arrange, creating a test user
+	usr1, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user1: %v", err)
+	}
+
+	// Creating a loan for the test user
+	expectedln1, err := CreateLoan(db, usr1.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	err = DeleteLoan(db, expectedln1.ID)
+	if err != nil {
+		t.Fatalf("DeleteLoan failed: %v", err)
+	}
+
+	checkLn, err := GetLoansByUserID(db, usr1.ID)
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+
+	require.Empty(t, checkLn)
+
+}
