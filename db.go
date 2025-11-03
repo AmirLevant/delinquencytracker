@@ -302,3 +302,19 @@ func GetAllLoans(db *sql.DB) ([]loan, error) {
 
 	return loans, nil
 }
+
+func DeleteLoan(db *sql.DB, LoanID int64) error {
+	query :=
+		`
+	DELETE FROM loans 
+	where id = $1
+	`
+
+	_, err := db.Exec(query, LoanID)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete loan %w", err)
+	}
+
+	return nil
+}
