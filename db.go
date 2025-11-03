@@ -181,3 +181,51 @@ func CreateLoan(db *sql.DB, userID int64, totalAmount, interestRate float64, ter
 	ln := loan{loanID, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken, createdAt, nil}
 	return ln, nil
 }
+
+func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
+	query :=
+		`
+	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
+	FROM loans 
+	WHERE user_id = $1
+	`
+
+	rows, err := db.Query(query, userID)
+
+	if err != nil {
+		return []loan{}, fmt.Errorf("failed to query loans for user %d: %w", userID, err)
+	}
+	defer rows.Close()
+
+	var loans []loan
+
+	for rows.Next() {
+		var l loan
+
+		err := rows.Scan(
+			&l.ID,
+			&l.UserID,
+			&l.TotalAmount,
+			&l.InterestRate,
+			&l.TermMonths,
+			&l.DayDue,
+			&l.Status,
+			&l.DateTaken,
+			&l.CreatedAt,
+		)
+
+		if err != nil {
+			return []loan{}, fmt.Errorf("failed to scan loan row: %w", err)
+		}
+
+		loans = append(loans, l) // we add l to loans
+	}
+
+	// we must check if the loop exited normally or fell silently
+	if err = rows.Err(); err != nil {
+		return []loan{}, fmt.Errorf("error iterating loan rows: %w", err)
+	}
+
+	return loans, nil
+
+}

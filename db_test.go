@@ -2,6 +2,7 @@ package delinquencytracker
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -249,4 +250,60 @@ func TestCreateLoan(t *testing.T) {
 	if ln.CreatedAt.IsZero() {
 		t.Error("Expected CreatedAt to be set")
 	}
+}
+
+func TestGetLoansByUserID_OneLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Act, creating a loan for this user
+	dateTaken := time.Now()
+	expectedln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 36, 15, "active", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Act, we query all the loans that belong to the userID
+	loans, err := GetLoansByUserID(db, usr.ID)
+
+	actualLn := loans[0]
+
+	// Assert, loan creation should succeed
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+	if expectedln.ID != actualLn.ID {
+		t.Error("Expected loan ID to match")
+	}
+	if expectedln.UserID != actualLn.UserID {
+		t.Errorf("Expected UserID %d, got %d", expectedln.UserID, actualLn.UserID)
+	}
+	if expectedln.TotalAmount != actualLn.TotalAmount {
+		t.Errorf("Expected TotalAmount 10000.00, got %f", actualLn.TotalAmount)
+	}
+	if expectedln.InterestRate != actualLn.InterestRate {
+		t.Errorf("Expected InterestRate 0.05, got %f", actualLn.InterestRate)
+	}
+	if expectedln.TermMonths != actualLn.TermMonths {
+		t.Errorf("Expected TermMonths 36, got %d", actualLn.TermMonths)
+	}
+	if expectedln.DayDue != actualLn.DayDue {
+		t.Errorf("Expected DayDue 15, got %d", actualLn.DayDue)
+	}
+	if expectedln.Status != actualLn.Status {
+		t.Errorf("Expected Status 'active', got '%s'", actualLn.Status)
+	}
+	if actualLn.CreatedAt.IsZero() {
+		t.Error("Expected CreatedAt to be set")
+	}
+
+	fmt.Println(actualLn)
+
 }
