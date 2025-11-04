@@ -620,3 +620,55 @@ func TestUpdatePayment(t *testing.T) {
 	}
 
 }
+
+func TestGetPaymentByID(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// Arrange
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Creating a loan for the test user
+	ln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Set up payment dates
+	dueDate := dateTaken.Add(30 * 24 * time.Hour) // 30 days after loan was taken
+	paidDate := dueDate.Add(-2 * 24 * time.Hour)  // paid 2 days before due date
+
+	// Create a payment to retrieve
+	createdPayment, err := CreatePayment(db, ln.ID, 1, 1000.00, 900.00, dueDate, paidDate)
+	if err != nil {
+		t.Fatalf("CreatePayment failed: %v", err)
+	}
+
+	// Act
+	retrievedPayment, err := GetPaymentByID(db, createdPayment.ID)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("GetPaymentByID failed: %v", err)
+	}
+
+	// Verify all fields match
+	require.Equal(t, createdPayment, retrievedPayment, "Retrieved payment should match created payment")
+}
+
+func TestGetPaymentByID_NotFound(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Act
+	_, err := GetPaymentByID(db, 99999) // Non-existent ID
+
+	// Assert
+	if err == nil {
+		t.Fatal("Expected error for non-existent payment, got nil")
+	}
+}

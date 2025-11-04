@@ -206,6 +206,42 @@ func UpdateLoan(db *sql.DB, loanID int64, totalAmount, interestRate float64, ter
 	return nil
 }
 
+// Get a singular loan based on it's ID
+func GetLoanByID(db *sql.DB, loanID int64) (loan, error) {
+	query := `
+	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
+	FROM loans
+	WHERE id = $1
+	`
+
+	var l loan
+
+	err := db.QueryRow(query, loanID).Scan(
+		&l.ID,
+		&l.UserID,
+		&l.TotalAmount,
+		&l.InterestRate,
+		&l.TermMonths,
+		&l.DayDue,
+		&l.Status,
+		&l.DateTaken,
+		&l.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return loan{}, fmt.Errorf("loan with ID %d not found", loanID)
+	}
+	if err != nil {
+		return loan{}, fmt.Errorf("failed to get loan: %w", err)
+	}
+
+	l.DateTaken = l.DateTaken.UTC()
+	l.CreatedAt = l.CreatedAt.UTC()
+
+	return l, nil
+}
+
+// Get all loans associated to a user
 func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 	query :=
 		`
@@ -257,6 +293,7 @@ func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 
 }
 
+// Gets all the loans in the database
 func GetAllLoans(db *sql.DB) ([]loan, error) {
 	query :=
 		`
@@ -383,6 +420,9 @@ func GetPaymentByID(db *sql.DB, paymentID int64) (payment, error) {
 		&p.PaidDate,
 		&p.CreatedAt,
 	)
+	p.DueDate = p.DueDate.UTC()
+	p.PaidDate = p.PaidDate.UTC()
+	p.CreatedAt = p.CreatedAt.UTC()
 
 	if err != nil {
 		return payment{}, fmt.Errorf("failed to get payment: %w", err)
