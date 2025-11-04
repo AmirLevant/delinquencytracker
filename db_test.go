@@ -835,6 +835,69 @@ func TestGetPaymentsByLoanID_NoPayments(t *testing.T) {
 	require.Empty(t, actualPayments, "Should return empty slice for loan with no payments")
 }
 
+func TestGetAllPayments(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// Arrange, creating multiple test users
+	usr1, err := CreateUser(db, "Loan User 1", "loanuser1@test.com", "555-1111")
+	if err != nil {
+		t.Fatalf("Failed to create test user1: %v", err)
+	}
+
+	usr2, err := CreateUser(db, "Loan User 2", "loanuser2@test.com", "555-2222")
+	if err != nil {
+		t.Fatalf("Failed to create test user2: %v", err)
+	}
+
+	// Creating loans for the test users
+	ln1, err := CreateLoan(db, usr1.ID, 10000.00, 0.05, 24, 10, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan 1 failed: %v", err)
+	}
+
+	ln2, err := CreateLoan(db, usr2.ID, 20000.00, 0.07, 36, 15, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan 2 failed: %v", err)
+	}
+
+	// Creating payments for different loans
+	dueDate1 := dateTaken.Add(30 * 24 * time.Hour)
+	paidDate1 := dueDate1.Add(-2 * 24 * time.Hour)
+	expectedPayment1, err := CreatePayment(db, ln1.ID, 1, 500.00, 500.00, dueDate1, paidDate1)
+	if err != nil {
+		t.Fatalf("CreatePayment 1 failed: %v", err)
+	}
+
+	dueDate2 := dateTaken.Add(30 * 24 * time.Hour)
+	paidDate2 := dueDate2.Add(-1 * 24 * time.Hour)
+	expectedPayment2, err := CreatePayment(db, ln2.ID, 1, 600.00, 600.00, dueDate2, paidDate2)
+	if err != nil {
+		t.Fatalf("CreatePayment 2 failed: %v", err)
+	}
+
+	dueDate3 := dateTaken.Add(60 * 24 * time.Hour)
+	paidDate3 := dueDate3.Add(1 * 24 * time.Hour) // late payment
+	expectedPayment3, err := CreatePayment(db, ln1.ID, 2, 500.00, 510.00, dueDate3, paidDate3)
+	if err != nil {
+		t.Fatalf("CreatePayment 3 failed: %v", err)
+	}
+
+	var expectedPayments = []payment{expectedPayment1, expectedPayment2, expectedPayment3}
+
+	// Act
+	actualPayments, err := GetAllPayments(db)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("GetAllPayments failed: %v", err)
+	}
+
+	require.Equal(t, expectedPayments, actualPayments)
+}
+
 func TestDeletePayment(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
