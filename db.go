@@ -318,3 +318,23 @@ func DeleteLoan(db *sql.DB, LoanID int64) error {
 
 	return nil
 }
+
+func CreatePayment(db *sql.DB, LoanID, payment_number int64, AmountDue, AmountPaid float64, DueDate, PaidDate time.Time) (payment, error) {
+	query :=
+		`
+	INSERT INTO payments (loan_id, payment_number, amount_due, amount_paid, due_date, paid_date)
+	VALUES ($1, $2, $3, $4, $5, $6)
+	returning id, created_at
+	`
+
+	var paymentID int64
+	var createdAt time.Time
+
+	err := db.QueryRow(query, LoanID, payment_number, AmountDue, AmountPaid, DueDate, PaidDate).Scan(&paymentID, &createdAt)
+	if err != nil {
+		return payment{}, fmt.Errorf("failed to create payment: %w", err)
+	}
+
+	pyment := payment{paymentID, LoanID, payment_number, AmountDue, AmountPaid, DueDate.UTC(), PaidDate.UTC(), createdAt.UTC()}
+	return pyment, nil
+}
