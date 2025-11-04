@@ -430,3 +430,53 @@ func GetPaymentByID(db *sql.DB, paymentID int64) (payment, error) {
 
 	return p, nil
 }
+
+// Gets all the payments associated with a singular loan
+func GetPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
+	query := `
+	SELECT id, loan_id, payment_number, amount_due, amount_paid, due_date, paid_date, created_at
+	FROM payments
+	WHERE loan_id = $1
+	ORDER BY payment_number
+	`
+
+	rows, err := db.Query(query, loanID)
+	if err != nil {
+		return []payment{}, fmt.Errorf("failed to query payments for loan %d: %w", loanID, err)
+	}
+	defer rows.Close()
+
+	var payments []payment
+
+	for rows.Next() {
+		var p payment
+
+		err := rows.Scan(
+			&p.ID,
+			&p.LoanID,
+			&p.PaymentNumber,
+			&p.AmountDue,
+			&p.AmountPaid,
+			&p.DueDate,
+			&p.PaidDate,
+			&p.CreatedAt,
+		)
+
+		if err != nil {
+			return []payment{}, fmt.Errorf("failed to scan payment row: %w", err)
+		}
+
+		p.DueDate = p.DueDate.UTC()
+		p.PaidDate = p.PaidDate.UTC()
+		p.CreatedAt = p.CreatedAt.UTC()
+
+		payments = append(payments, p)
+	}
+
+	// we must check if the loop exited normally or fell silently
+	if err = rows.Err(); err != nil {
+		return []payment{}, fmt.Errorf("error iterating payment rows: %w", err)
+	}
+
+	return payments, nil
+}
