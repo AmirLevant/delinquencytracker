@@ -163,3 +163,158 @@ func DeleteUser(db *sql.DB, userID int64) error {
 	return nil
 
 }
+
+func CreateLoan(db *sql.DB, userID int64, totalAmount, interestRate float64, termMonths, dayDue int, status string, dateTaken time.Time) (loan, error) {
+	query := `
+        INSERT INTO loans (user_id, total_amount, interest_rate, term_months, day_due, status, date_taken)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, created_at
+    `
+	var loanID int64
+	var createdAt time.Time
+
+	err := db.QueryRow(query, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken).Scan(&loanID, &createdAt)
+	if err != nil {
+		return loan{}, fmt.Errorf("failed to create loan: %w", err)
+	}
+
+	ln := loan{loanID, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken.UTC(), createdAt.UTC(), nil}
+	return ln, nil
+}
+
+func UpdateLoan(db *sql.DB, loanID int64, totalAmount, interestRate float64, termMonths, dayDue int, status string, dateTaken time.Time) error {
+	query := `
+		UPDATE loans
+		SET total_amount = $1, interest_rate = $2, term_months = $3, day_due = $4, status = $5, date_taken = $6
+		WHERE id = $7
+	`
+
+	result, err := db.Exec(query, totalAmount, interestRate, termMonths, dayDue, status, dateTaken, loanID)
+	if err != nil {
+		return fmt.Errorf("failed to update loan: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("loan with ID %d not found", loanID)
+	}
+
+	return nil
+}
+
+func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
+	query :=
+		`
+	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
+	FROM loans 
+	WHERE user_id = $1
+	ORDER BY id 
+	`
+
+	rows, err := db.Query(query, userID)
+
+	if err != nil {
+		return []loan{}, fmt.Errorf("failed to query loans for user %d: %w", userID, err)
+	}
+	defer rows.Close()
+
+	var loans []loan
+
+	for rows.Next() {
+		var l loan
+
+		err := rows.Scan(
+			&l.ID,
+			&l.UserID,
+			&l.TotalAmount,
+			&l.InterestRate,
+			&l.TermMonths,
+			&l.DayDue,
+			&l.Status,
+			&l.DateTaken,
+			&l.CreatedAt,
+		)
+
+		if err != nil {
+			return []loan{}, fmt.Errorf("failed to scan loan row: %w", err)
+		}
+
+		l.DateTaken = l.DateTaken.UTC()
+		l.CreatedAt = l.CreatedAt.UTC()
+		loans = append(loans, l) // we add l to loans
+	}
+
+	// we must check if the loop exited normally or fell silently
+	if err = rows.Err(); err != nil {
+		return []loan{}, fmt.Errorf("error iterating loan rows: %w", err)
+	}
+
+	return loans, nil
+
+}
+
+func GetAllLoans(db *sql.DB) ([]loan, error) {
+	query :=
+		`
+	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
+	FROM loans 
+	ORDER BY id 
+	`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var loans []loan
+
+	for rows.Next() {
+		var ln loan
+
+		err := rows.Scan(
+			&ln.ID,
+			&ln.UserID,
+			&ln.TotalAmount,
+			&ln.InterestRate,
+			&ln.TermMonths,
+			&ln.DayDue,
+			&ln.Status,
+			&ln.DateTaken,
+			&ln.CreatedAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+		ln.DateTaken = ln.DateTaken.UTC()
+		ln.CreatedAt = ln.CreatedAt.UTC()
+
+		loans = append(loans, ln)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return loans, nil
+}
+
+func DeleteLoan(db *sql.DB, LoanID int64) error {
+	query :=
+		`
+	DELETE FROM loans 
+	where id = $1
+	`
+
+	_, err := db.Exec(query, LoanID)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete loan %w", err)
+	}
+
+	return nil
+}

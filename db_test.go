@@ -3,6 +3,7 @@ package delinquencytracker
 import (
 	"database/sql"
 	"testing"
+	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -201,5 +202,318 @@ func TestDeleteUser(t *testing.T) {
 		t.Fatalf("Error should not be nil, but a message saying user not found")
 	}
 	require.Equal(t, user{}, deletedUsr, "User has been deleted and not found")
+
+}
+
+// 23/10/25 create test for CreateLoan
+// expecting to create a loan for a user and verify all fields are set correctly
+func TestCreateLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Act, creating a loan for this user
+	dateTaken := time.Now()
+	ln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 36, 15, "active", dateTaken)
+
+	// Assert, loan creation should succeed
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+	if ln.ID == 0 {
+		t.Error("Expected loan ID to be set")
+	}
+	if ln.UserID != usr.ID {
+		t.Errorf("Expected UserID %d, got %d", usr.ID, ln.UserID)
+	}
+	if ln.TotalAmount != 10000.00 {
+		t.Errorf("Expected TotalAmount 10000.00, got %f", ln.TotalAmount)
+	}
+	if ln.InterestRate != 0.05 {
+		t.Errorf("Expected InterestRate 0.05, got %f", ln.InterestRate)
+	}
+	if ln.TermMonths != 36 {
+		t.Errorf("Expected TermMonths 36, got %d", ln.TermMonths)
+	}
+	if ln.DayDue != 15 {
+		t.Errorf("Expected DayDue 15, got %d", ln.DayDue)
+	}
+	if ln.Status != "active" {
+		t.Errorf("Expected Status 'active', got '%s'", ln.Status)
+	}
+	if ln.CreatedAt.IsZero() {
+		t.Error("Expected CreatedAt to be set")
+	}
+}
+
+func TestUpdateLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange
+	// Creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Creating a loan for this user
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+	ln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 36, 15, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Act
+	// Updating the loan with new values
+	newDateTaken := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -30) // 30 days ago
+	err = UpdateLoan(db, ln.ID, 15000.00, 0.08, 48, 20, "refinanced", newDateTaken)
+
+	// Assert
+	// Update should succeed
+	if err != nil {
+		t.Fatalf("UpdateLoan failed: %v", err)
+	}
+
+	// Ensuring the update worked by querying the loans
+	loans, err := GetLoansByUserID(db, usr.ID)
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+
+	// Should have exactly one loan
+	if len(loans) != 1 {
+		t.Fatalf("Expected 1 loan, got %d", len(loans))
+	}
+
+	updatedLoan := loans[0]
+
+	// Ensuring the updated loan has the new values
+	if updatedLoan.TotalAmount != 15000.00 {
+		t.Errorf("Expected TotalAmount 15000.00, got %f", updatedLoan.TotalAmount)
+	}
+	if updatedLoan.InterestRate != 0.08 {
+		t.Errorf("Expected InterestRate 0.08, got %f", updatedLoan.InterestRate)
+	}
+	if updatedLoan.TermMonths != 48 {
+		t.Errorf("Expected TermMonths 48, got %d", updatedLoan.TermMonths)
+	}
+	if updatedLoan.DayDue != 20 {
+		t.Errorf("Expected DayDue 20, got %d", updatedLoan.DayDue)
+	}
+	if updatedLoan.Status != "refinanced" {
+		t.Errorf("Expected Status 'refinanced', got '%s'", updatedLoan.Status)
+	}
+	// Verify DateTaken was updated (comparing truncated dates)
+	if !updatedLoan.DateTaken.Equal(newDateTaken) {
+		t.Errorf("Expected DateTaken %v, got %v", newDateTaken, updatedLoan.DateTaken)
+	}
+}
+
+func TestGetLoansByUserID_OneLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Act, creating a loan for this user
+	dateTaken := time.Now()
+	expectedln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 36, 15, "active", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Act, we query all the loans that belong to the userID
+	loans, err := GetLoansByUserID(db, usr.ID)
+
+	actualLn := loans[0]
+
+	// Assert, loan creation should succeed
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+	if expectedln.ID != actualLn.ID {
+		t.Error("Expected loan ID to match")
+	}
+	if expectedln.UserID != actualLn.UserID {
+		t.Errorf("Expected UserID %d, got %d", expectedln.UserID, actualLn.UserID)
+	}
+	if expectedln.TotalAmount != actualLn.TotalAmount {
+		t.Errorf("Expected TotalAmount 10000.00, got %f", actualLn.TotalAmount)
+	}
+	if expectedln.InterestRate != actualLn.InterestRate {
+		t.Errorf("Expected InterestRate 0.05, got %f", actualLn.InterestRate)
+	}
+	if expectedln.TermMonths != actualLn.TermMonths {
+		t.Errorf("Expected TermMonths 36, got %d", actualLn.TermMonths)
+	}
+	if expectedln.DayDue != actualLn.DayDue {
+		t.Errorf("Expected DayDue 15, got %d", actualLn.DayDue)
+	}
+	if expectedln.Status != actualLn.Status {
+		t.Errorf("Expected Status 'active', got '%s'", actualLn.Status)
+	}
+	if actualLn.CreatedAt.IsZero() {
+		t.Error("Expected CreatedAt to be set")
+	}
+
+}
+
+func TestGetLoansByUserID_MultiLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Act, creating a loan for this user
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	expectedln1, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	expectedln2, err := CreateLoan(db, usr.ID, 20000.00, 0.25, 26, 15, "paid_off", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	expectedln3, err := CreateLoan(db, usr.ID, 30000.00, 0.35, 36, 25, "defaulted", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Act, we query all the loans that belong to the userID
+	actualLoans, err := GetLoansByUserID(db, usr.ID)
+
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+
+	var expectedLoans = []loan{expectedln1, expectedln2, expectedln3}
+
+	require.Equal(t, expectedLoans, actualLoans)
+
+}
+
+func TestGetLoansByUserID_NoLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user first
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Act, no loan for this user
+
+	actualLoans, err := GetLoansByUserID(db, usr.ID)
+
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+
+	// when comparing actualLoans to an expectedLoans there is an issue since GetLoansByUserID()
+	// initializes a slice with nils, which is why it is different
+	require.Empty(t, actualLoans)
+
+}
+
+func TestGetAllLoans(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// Arrange, creating a multiple test users
+	usr1, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user1: %v", err)
+	}
+
+	usr2, err := CreateUser(db, "Test User", "loanuser2@test.com", "555-2222")
+	if err != nil {
+		t.Fatalf("Failed to create test user2: %v", err)
+	}
+
+	usr3, err := CreateUser(db, "User Third", "loanuser3@test.com", "555-3333")
+	if err != nil {
+		t.Fatalf("Failed to create test user3: %v", err)
+	}
+
+	expectedln1, err := CreateLoan(db, usr1.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	expectedln2, err := CreateLoan(db, usr2.ID, 20000.00, 0.25, 26, 15, "paid_off", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	expectedln3, err := CreateLoan(db, usr3.ID, 30000.00, 0.35, 36, 25, "defaulted", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	var expectedLoans = []loan{expectedln1, expectedln2, expectedln3}
+
+	actualLoans, err := GetAllLoans(db)
+
+	if err != nil {
+		t.Fatalf("GetAllLoans failed: %v", err)
+	}
+
+	require.Equal(t, expectedLoans, actualLoans)
+
+}
+
+func TestDeleteLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// Arrange, creating a test user
+	usr1, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user1: %v", err)
+	}
+
+	// Creating a loan for the test user
+	expectedln1, err := CreateLoan(db, usr1.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	err = DeleteLoan(db, expectedln1.ID)
+	if err != nil {
+		t.Fatalf("DeleteLoan failed: %v", err)
+	}
+
+	checkLn, err := GetLoansByUserID(db, usr1.ID)
+	if err != nil {
+		t.Fatalf("GetLoansByUserID failed: %v", err)
+	}
+
+	require.Empty(t, checkLn)
 
 }
