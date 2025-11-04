@@ -550,3 +550,73 @@ func TestCreatePayment(t *testing.T) {
 	require.Equal(t, expectedPyment, pyment)
 
 }
+
+func TestUpdatePayment(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// Arrange
+
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Creating a loan for the test user
+	ln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Set up payment dates
+	dueDate := dateTaken.Add(30 * 24 * time.Hour) // 30 days after loan was taken
+	paidDate := dueDate.Add(-2 * 24 * time.Hour)  // paid 2 days before due date
+
+	pyment, err := CreatePayment(db, ln.ID, 1, 1000, 900, dueDate, paidDate)
+	if err != nil {
+		t.Fatalf("Create Payment failed %v:", err)
+	}
+
+	// Act
+	// Updating the payment with new values
+	newDueDate := dateTaken.Add(45 * 24 * time.Hour)  // 45 days after loan was taken
+	newPaidDate := newDueDate.Add(3 * 24 * time.Hour) // paid 3 days late
+
+	err = UpdatePayment(db, pyment.ID, ln.ID, 2, 1200.00, 1200.00, newDueDate, newPaidDate)
+
+	// Assert
+	// Update should succeed
+	if err != nil {
+		t.Fatalf("UpdatePayment failed: %v", err)
+	}
+
+	// Ensuring the update worked by querying the payment
+	updatedPayment, err := GetPaymentByID(db, pyment.ID)
+	if err != nil {
+		t.Fatalf("GetPaymentByID failed: %v", err)
+	}
+
+	// Ensuring the updated payment has the new values
+	if updatedPayment.LoanID != ln.ID {
+		t.Errorf("Expected LoanID %d, got %d", ln.ID, updatedPayment.LoanID)
+	}
+	if updatedPayment.PaymentNumber != 2 {
+		t.Errorf("Expected PaymentNumber 2, got %d", updatedPayment.PaymentNumber)
+	}
+	if updatedPayment.AmountDue != 1200.00 {
+		t.Errorf("Expected AmountDue 1200.00, got %f", updatedPayment.AmountDue)
+	}
+	if updatedPayment.AmountPaid != 1200.00 {
+		t.Errorf("Expected AmountPaid 1200.00, got %f", updatedPayment.AmountPaid)
+	}
+
+	// Verify dates were updated (comparing truncated dates)
+	if !updatedPayment.DueDate.Equal(newDueDate) {
+		t.Errorf("Expected DueDate %v, got %v", newDueDate, updatedPayment.DueDate)
+	}
+	if !updatedPayment.PaidDate.Equal(newPaidDate) {
+		t.Errorf("Expected PaidDate %v, got %v", newPaidDate, updatedPayment.PaidDate)
+	}
+
+}

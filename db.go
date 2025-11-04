@@ -338,3 +338,55 @@ func CreatePayment(db *sql.DB, LoanID, payment_number int64, AmountDue, AmountPa
 	pyment := payment{paymentID, LoanID, payment_number, AmountDue, AmountPaid, DueDate.UTC(), PaidDate.UTC(), createdAt.UTC()}
 	return pyment, nil
 }
+
+func UpdatePayment(db *sql.DB, UserID, LoanID, payment_number int64, AmountDue, AmountPaid float64, DueDate, PaidDate time.Time) error {
+	query :=
+		`
+	UPDATE payments
+	SET loan_id = $1, payment_number = $2, amount_due = $3, amount_paid = $4, due_date = $5, paid_date = $6
+	WHERE id = $7
+	`
+
+	result, err := db.Exec(query, LoanID, payment_number, AmountDue, AmountPaid, DueDate, PaidDate, UserID)
+	if err != nil {
+		return fmt.Errorf("failed to update payment: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("payment with ID %d not found", UserID)
+	}
+
+	return nil
+
+}
+
+func GetPaymentByID(db *sql.DB, paymentID int64) (payment, error) {
+	query := `
+        SELECT id, loan_id, payment_number, amount_due, amount_paid, due_date, paid_date, created_at
+        FROM payments
+        WHERE id = $1
+    `
+
+	var p payment
+	err := db.QueryRow(query, paymentID).Scan(
+		&p.ID,
+		&p.LoanID,
+		&p.PaymentNumber,
+		&p.AmountDue,
+		&p.AmountPaid,
+		&p.DueDate,
+		&p.PaidDate,
+		&p.CreatedAt,
+	)
+
+	if err != nil {
+		return payment{}, fmt.Errorf("failed to get payment: %w", err)
+	}
+
+	return p, nil
+}
