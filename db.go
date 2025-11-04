@@ -207,7 +207,7 @@ func UpdateLoan(db *sql.DB, loanID int64, totalAmount, interestRate float64, ter
 }
 
 // Get a singular loan based on it's ID
-func GetLoanByID(db *sql.DB, loanID int64) (loan, error) {
+func GetLoanByLoanID(db *sql.DB, loanID int64) (loan, error) {
 	query := `
 	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
 	FROM loans

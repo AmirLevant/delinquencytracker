@@ -315,7 +315,7 @@ func TestUpdateLoan(t *testing.T) {
 	}
 }
 
-func TestGetLoanByID(t *testing.T) {
+func TestGetLoanByLoanID(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
 
@@ -334,7 +334,7 @@ func TestGetLoanByID(t *testing.T) {
 	}
 
 	// Act
-	retrievedLoan, err := GetLoanByID(db, createdLoan.ID)
+	retrievedLoan, err := GetLoanByLoanID(db, createdLoan.ID)
 
 	// Assert
 	if err != nil {
@@ -350,7 +350,7 @@ func TestGetLoanByID_NotFound(t *testing.T) {
 	defer teardownTestDB(db)
 
 	// Act, Trying to get a loan that does not exist
-	ln, err := GetLoanByID(db, 99999)
+	ln, err := GetLoanByLoanID(db, 99999)
 
 	// Assert, Should return error
 	assert.Error(t, err, "Expected error for non-existent loan")
