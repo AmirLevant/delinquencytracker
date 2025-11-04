@@ -480,3 +480,19 @@ func GetPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
 
 	return payments, nil
 }
+
+// Deletes a singular payment based on a given ID
+func DeletePayment(db *sql.DB, paymentID int64) error {
+	query :=
+		`
+	DELETE FROM payments
+	WHERE id = $1
+	`
+	_, err := db.Exec(query, paymentID)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete payment %w", err)
+	}
+
+	return nil
+}

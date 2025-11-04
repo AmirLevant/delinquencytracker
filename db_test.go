@@ -834,3 +834,46 @@ func TestGetPaymentsByLoanID_NoPayments(t *testing.T) {
 	// initializes a slice with nils, which is why it is different
 	require.Empty(t, actualPayments, "Should return empty slice for loan with no payments")
 }
+
+func TestDeletePayment(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// Arrange, creating a test user
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Creating a loan for the test user
+	ln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Set up payment dates
+	dueDate := dateTaken.Add(30 * 24 * time.Hour) // 30 days after loan was taken
+	paidDate := dueDate.Add(-2 * 24 * time.Hour)  // paid 2 days before due date
+
+	// Creating a payment to delete
+	pyment, err := CreatePayment(db, ln.ID, 1, 1000.00, 900.00, dueDate, paidDate)
+	if err != nil {
+		t.Fatalf("CreatePayment failed: %v", err)
+	}
+
+	// Act
+	err = DeletePayment(db, pyment.ID)
+	if err != nil {
+		t.Fatalf("DeletePayment failed: %v", err)
+	}
+
+	// Assert - verify payment no longer exists
+	checkPayments, err := GetPaymentsByLoanID(db, ln.ID)
+	if err != nil {
+		t.Fatalf("GetPaymentsByLoanID failed: %v", err)
+	}
+
+	require.Empty(t, checkPayments)
+}
