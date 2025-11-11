@@ -16,8 +16,10 @@ type payment struct {
 // method to check if the payment is late
 // true means late, false means not late
 func (p payment) CheckLate() bool {
-	if p.PaidDate.After(p.DueDate) {
-		return true // Payment was completed after the DueDate, meaning the payment is late
+	// If payment hasn't been made yet (PaidDate is zero), check if we're past due date
+	if p.PaidDate.IsZero() {
+		return time.Now().After(p.DueDate) // Late if current time is after due date
 	}
-	return false
+	// If payment was made, check if it was made after the due date
+	return p.PaidDate.After(p.DueDate)
 }
