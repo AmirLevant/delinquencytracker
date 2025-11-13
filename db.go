@@ -90,7 +90,7 @@ func GetUserByEmail(db *sql.DB, email string) (user, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return user{}, fmt.Errorf("user with Email %d not found", email)
+		return user{}, fmt.Errorf("user with Email %s not found", email)
 	}
 	if err != nil {
 		return user{}, fmt.Errorf("failed to get user: %w", err)
