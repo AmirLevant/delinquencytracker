@@ -111,6 +111,33 @@ func GetUserByID(db *sql.DB, userID int64) (user, error) {
 	return usr, nil
 }
 
+func GetUserByEmail(db *sql.DB, email string) (user, error) {
+	query := `
+	SELECT id, name, email, phone, created_at
+	FROM users
+	WHERE email = $3
+	`
+
+	usr := user{}
+
+	err := db.QueryRow(query, email).Scan(
+		&usr.ID,
+		&usr.Name,
+		&usr.Email,
+		&usr.Phone,
+		&usr.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return user{}, fmt.Errorf("user with Email %d not found", email)
+	}
+	if err != nil {
+		return user{}, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return usr, nil
+}
+
 func GetAllUsers(db *sql.DB) ([]user, error) {
 	query :=
 		`

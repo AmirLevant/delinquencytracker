@@ -71,6 +71,32 @@ func TestGetUserByID_UserNotFound(t *testing.T) {
 	require.Equal(t, user{}, usr, "Expected empty user struct")
 }
 
+func TestGetUserByEmail(t *testing.T) {
+
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user
+	usr, err := CreateUser(db, "Test User", "test@test.com", "555-4444")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	//Act: Get the user by ID
+	usr, err = GetUserByEmail(db, usr.Email)
+
+	//Assert: Check results
+	if err != nil {
+		t.Errorf("GetUserByEmail failed: %v", err)
+	}
+	if usr.Name != "Test User" {
+		t.Fatalf("Expected name 'Test User', got '%s'", usr.Name)
+	}
+	if usr.Email != "test@test.com" {
+		t.Fatalf("Expected email 'test@test.com', got '%s'", usr.Email)
+	}
+}
+
 func TestCreateUser_DuplicateEmail(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
