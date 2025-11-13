@@ -126,6 +126,36 @@ func TestGetUserByPhone(t *testing.T) {
 	}
 }
 
+func TestCountUsers(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user
+	usr1, err := CreateUser(db, "Test User", "test@test.com", "555-4444")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Arrange, creating a test user
+	usr2, err := CreateUser(db, "Test User2", "test2@test.com", "222-4444")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	_ = usr1 // setting them to empty to remove the err
+	_ = usr2 // setting them to empty to remove the err
+
+	expectedCount := int64(2)
+	actualCount, err := CountUsers(db)
+
+	if err != nil {
+		t.Fatalf("Failed to Count Users: %v", err)
+	}
+
+	require.Equal(t, expectedCount, actualCount)
+
+}
+
 func TestCreateUser_DuplicateEmail(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)

@@ -163,6 +163,19 @@ func GetAllUsers(db *sql.DB) ([]user, error) {
 	return users, nil
 }
 
+func CountUsers(db *sql.DB) (int64, error) {
+	query := `SELECT COUNT(*) FROM users`
+
+	var count int64
+
+	err := db.QueryRow(query).Scan(&count)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count, nil
+}
+
 func DeleteUser(db *sql.DB, userID int64) error {
 	query :=
 		`
