@@ -76,7 +76,7 @@ func GetUserByEmail(db *sql.DB, email string) (user, error) {
 	query := `
 	SELECT id, name, email, phone, created_at
 	FROM users
-	WHERE email = $3
+	WHERE email = $1
 	`
 
 	usr := user{}
