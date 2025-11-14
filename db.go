@@ -8,45 +8,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// dbConfig holds the database connections params
-type dbConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DBName   string
-}
-
-// ConnectDB establishes a connection to the Postgres database
-// It retusn a *sql.DB connection pool and any error encountered
-
-func newDB(config dbConfig) (*sql.DB, error) {
-	connStr := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		config.Host,
-		config.Port,
-		config.User,
-		config.Password,
-		config.DBName,
-	)
-
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, fmt.Errorf("error opening database: %w", err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to database: %w", err)
-	}
-
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * 60)
-
-	return db, nil
-}
-
 // we pass db connection and the user information
 // we return the new user's ID and any error
 func CreateUser(db *sql.DB, name, email, phone string) (user, error) {
@@ -111,6 +72,60 @@ func GetUserByID(db *sql.DB, userID int64) (user, error) {
 	return usr, nil
 }
 
+func GetUserByEmail(db *sql.DB, email string) (user, error) {
+	query := `
+	SELECT id, name, email, phone, created_at
+	FROM users
+	WHERE email = $1
+	`
+
+	usr := user{}
+
+	err := db.QueryRow(query, email).Scan(
+		&usr.ID,
+		&usr.Name,
+		&usr.Email,
+		&usr.Phone,
+		&usr.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return user{}, fmt.Errorf("user with Email %s not found", email)
+	}
+	if err != nil {
+		return user{}, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return usr, nil
+}
+
+func GetUserByPhone(db *sql.DB, phone string) (user, error) {
+	query := `
+	SELECT id, name, email, phone, created_at
+	FROM users
+	WHERE phone = $1
+	`
+
+	usr := user{}
+
+	err := db.QueryRow(query, phone).Scan(
+		&usr.ID,
+		&usr.Name,
+		&usr.Email,
+		&usr.Phone,
+		&usr.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return user{}, fmt.Errorf("user with phone %s not found", phone)
+	}
+	if err != nil {
+		return user{}, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return usr, nil
+}
+
 func GetAllUsers(db *sql.DB) ([]user, error) {
 	query :=
 		`
@@ -146,6 +161,19 @@ func GetAllUsers(db *sql.DB) ([]user, error) {
 		return nil, err
 	}
 	return users, nil
+}
+
+func CountUsers(db *sql.DB) (int64, error) {
+	query := `SELECT COUNT(*) FROM users`
+
+	var count int64
+
+	err := db.QueryRow(query).Scan(&count)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count, nil
 }
 
 func DeleteUser(db *sql.DB, userID int64) error {
@@ -308,7 +336,7 @@ func GetAllLoans(db *sql.DB) ([]loan, error) {
 	}
 	defer rows.Close()
 
-	var loans []loan
+	loans := []loan{}
 
 	for rows.Next() {
 		var ln loan
@@ -338,6 +366,68 @@ func GetAllLoans(db *sql.DB) ([]loan, error) {
 	}
 
 	return loans, nil
+}
+
+// GetLoansByStatus retrieves all loans with a specific status
+func GetLoansByStatus(db *sql.DB, status string) ([]loan, error) {
+	query := `
+	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at 
+	FROM loans
+	where status = $1
+	ORDER BY id
+	`
+	rows, err := db.Query(query, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	loans := []loan{}
+
+	for rows.Next() {
+		var ln loan
+
+		err := rows.Scan(
+			&ln.ID,
+			&ln.UserID,
+			&ln.TotalAmount,
+			&ln.InterestRate,
+			&ln.TermMonths,
+			&ln.DayDue,
+			&ln.Status,
+			&ln.DateTaken,
+			&ln.CreatedAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+		ln.DateTaken = ln.DateTaken.UTC()
+		ln.CreatedAt = ln.CreatedAt.UTC()
+
+		loans = append(loans, ln)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return loans, nil
+}
+
+// CountLoansByStatus returns the count of loans with a specific status
+func CountLoansByStatus(db *sql.DB, status string) (int64, error) {
+	query := `
+	SELECT COUNT(*) 
+	FROM loans 
+	where status = $1`
+
+	var count int64
+
+	err := db.QueryRow(query, status).Scan(&count)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count, nil
 }
 
 func DeleteLoan(db *sql.DB, LoanID int64) error {
@@ -525,6 +615,57 @@ func GetAllPayments(db *sql.DB) ([]payment, error) {
 
 	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+
+	return payments, nil
+}
+
+// GetUnpaidPaymentsByLoanID retrieves all unpaid payments for a loan
+func GetUnpaidPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
+	query := `
+	SELECT id, loan_id, payment_number, amount_due, amount_paid, due_date, paid_date, created_at
+	FROM payments
+	WHERE loan_id = $1 
+	AND (paid_date IS NULL OR amount_paid < amount_due)
+	ORDER BY payment_number
+	`
+
+	rows, err := db.Query(query, loanID)
+	if err != nil {
+		return []payment{}, fmt.Errorf("failed to query unpaid payments for loan %d: %w", loanID, err)
+	}
+	defer rows.Close()
+
+	var payments []payment
+
+	for rows.Next() {
+		var p payment
+
+		err := rows.Scan(
+			&p.ID,
+			&p.LoanID,
+			&p.PaymentNumber,
+			&p.AmountDue,
+			&p.AmountPaid,
+			&p.DueDate,
+			&p.PaidDate,
+			&p.CreatedAt,
+		)
+
+		if err != nil {
+			return []payment{}, fmt.Errorf("failed to scan payment row: %w", err)
+		}
+
+		p.DueDate = p.DueDate.UTC()
+		p.PaidDate = p.PaidDate.UTC()
+		p.CreatedAt = p.CreatedAt.UTC()
+
+		payments = append(payments, p)
+	}
+
+	// Check if the loop exited normally or fell silently
+	if err = rows.Err(); err != nil {
+		return []payment{}, fmt.Errorf("error iterating payment rows: %w", err)
 	}
 
 	return payments, nil

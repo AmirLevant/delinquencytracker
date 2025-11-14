@@ -71,6 +71,91 @@ func TestGetUserByID_UserNotFound(t *testing.T) {
 	require.Equal(t, user{}, usr, "Expected empty user struct")
 }
 
+func TestGetUserByEmail(t *testing.T) {
+
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user
+	usr, err := CreateUser(db, "Test User", "test@test.com", "555-4444")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	//Act: Get the user by ID
+	usr, err = GetUserByEmail(db, usr.Email)
+
+	//Assert: Check results
+	if err != nil {
+		t.Errorf("GetUserByEmail failed: %v", err)
+	}
+	if usr.Name != "Test User" {
+		t.Fatalf("Expected name 'Test User', got '%s'", usr.Name)
+	}
+	if usr.Email != "test@test.com" {
+		t.Fatalf("Expected email 'test@test.com', got '%s'", usr.Email)
+	}
+}
+
+func TestGetUserByPhone(t *testing.T) {
+
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user
+	usr, err := CreateUser(db, "Test User", "test@test.com", "555-4444")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	//Act: Get the user by ID
+	usr, err = GetUserByPhone(db, usr.Phone)
+
+	//Assert: Check results
+	if err != nil {
+		t.Errorf("GetUserByEmail failed: %v", err)
+	}
+	if usr.Name != "Test User" {
+		t.Fatalf("Expected name 'Test User', got '%s'", usr.Name)
+	}
+	if usr.Email != "test@test.com" {
+		t.Fatalf("Expected email 'test@test.com', got '%s'", usr.Email)
+	}
+	if usr.Phone != "555-4444" {
+		t.Fatalf("Expected phone '555-4444', got '%s'", usr.Phone)
+	}
+}
+
+func TestCountUsers(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a test user
+	usr1, err := CreateUser(db, "Test User", "test@test.com", "555-4444")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Arrange, creating a test user
+	usr2, err := CreateUser(db, "Test User2", "test2@test.com", "222-4444")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	_ = usr1 // setting them to empty to remove the err
+	_ = usr2 // setting them to empty to remove the err
+
+	expectedCount := int64(2)
+	actualCount, err := CountUsers(db)
+
+	if err != nil {
+		t.Fatalf("Failed to Count Users: %v", err)
+	}
+
+	require.Equal(t, expectedCount, actualCount)
+
+}
+
 func TestCreateUser_DuplicateEmail(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
@@ -528,6 +613,137 @@ func TestGetAllLoans(t *testing.T) {
 
 }
 
+func TestGetLoansByStatus(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a multiple test users
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	usr1, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user1: %v", err)
+	}
+
+	usr2, err := CreateUser(db, "Test User", "loanuser2@test.com", "555-2222")
+	if err != nil {
+		t.Fatalf("Failed to create test user2: %v", err)
+	}
+
+	usr3, err := CreateUser(db, "User Third", "loanuser3@test.com", "555-3333")
+	if err != nil {
+		t.Fatalf("Failed to create test user3: %v", err)
+	}
+
+	expectedln1, err := CreateLoan(db, usr1.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	expectedln2, err := CreateLoan(db, usr2.ID, 20000.00, 0.25, 26, 15, "active", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	expectedln3, err := CreateLoan(db, usr3.ID, 30000.00, 0.35, 36, 25, "defaulted", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	var expectedActiveLoans = []loan{expectedln1, expectedln2}
+	var expectedDefaultedLoans = []loan{expectedln3}
+	var expectedPaidOffLoans = []loan{}
+
+	// Act
+
+	actualActiveLoans, err := GetLoansByStatus(db, "active")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by Active Status: %v", err)
+	}
+
+	require.Equal(t, expectedActiveLoans, actualActiveLoans)
+
+	actualDefaultedLoans, err := GetLoansByStatus(db, "defaulted")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by Defaulted Status: %v", err)
+	}
+
+	require.Equal(t, expectedDefaultedLoans, actualDefaultedLoans)
+
+	actualPaidOffLoans, err := GetLoansByStatus(db, "paid-off")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by paid-off Status: %v", err)
+	}
+	require.Equal(t, expectedPaidOffLoans, actualPaidOffLoans)
+
+}
+
+func TestCountLoansByStatus(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	usr1, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user1: %v", err)
+	}
+
+	usr2, err := CreateUser(db, "Test User", "loanuser2@test.com", "555-2222")
+	if err != nil {
+		t.Fatalf("Failed to create test user2: %v", err)
+	}
+
+	usr3, err := CreateUser(db, "User Third", "loanuser3@test.com", "555-3333")
+	if err != nil {
+		t.Fatalf("Failed to create test user3: %v", err)
+	}
+
+	_, err = CreateLoan(db, usr1.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	_, err = CreateLoan(db, usr2.ID, 20000.00, 0.25, 26, 15, "active", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	_, err = CreateLoan(db, usr3.ID, 30000.00, 0.35, 36, 25, "defaulted", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	var expectedCountActiveLoans = int64(2)
+	var expectedCountDefaultedLoans = int64(1)
+	var expectedCountPaidOffLoans = int64(0)
+
+	// Act
+
+	actualCountActiveLoans, err := CountLoansByStatus(db, "active")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by Active Status: %v", err)
+	}
+
+	require.Equal(t, expectedCountActiveLoans, actualCountActiveLoans)
+
+	actualDefaultedLoans, err := CountLoansByStatus(db, "defaulted")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by Defaulted Status: %v", err)
+	}
+
+	require.Equal(t, expectedCountDefaultedLoans, actualDefaultedLoans)
+
+	actualPaidOffLoans, err := CountLoansByStatus(db, "paid-off")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by paid-off Status: %v", err)
+	}
+	require.Equal(t, expectedCountPaidOffLoans, actualPaidOffLoans)
+
+}
+
 func TestDeleteLoan(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
@@ -896,6 +1112,136 @@ func TestGetAllPayments(t *testing.T) {
 	}
 
 	require.Equal(t, expectedPayments, actualPayments)
+}
+
+func TestGetUnpaidPaymentsByLoanID(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// Arrange
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Creating a loan for the test user
+	ln, err := CreateLoan(db, usr.ID, 10000.00, 0.05, 36, 15, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Create multiple payments with different payment statuses
+
+	// Payment 1: Fully paid on time
+	dueDate1 := dateTaken.Add(30 * 24 * time.Hour)
+	paidDate1 := dueDate1.Add(-2 * 24 * time.Hour)
+	_, err = CreatePayment(db, ln.ID, 1, 300.00, 300.00, dueDate1, paidDate1)
+	if err != nil {
+		t.Fatalf("CreatePayment 1 failed: %v", err)
+	}
+
+	// Payment 2: Partially paid (unpaid)
+	dueDate2 := dateTaken.Add(60 * 24 * time.Hour)
+	paidDate2 := dueDate2.Add(-1 * 24 * time.Hour)
+	expectedPayment2, err := CreatePayment(db, ln.ID, 2, 300.00, 150.00, dueDate2, paidDate2)
+	if err != nil {
+		t.Fatalf("CreatePayment 2 failed: %v", err)
+	}
+
+	// Payment 3: Not paid at all (PaidDate would be zero/null)
+	dueDate3 := dateTaken.Add(90 * 24 * time.Hour)
+	expectedPayment3, err := CreatePayment(db, ln.ID, 3, 300.00, 0.00, dueDate3, time.Time{})
+	if err != nil {
+		t.Fatalf("CreatePayment 3 failed: %v", err)
+	}
+
+	// Payment 4: Fully paid late (should not be in unpaid list)
+	dueDate4 := dateTaken.Add(120 * 24 * time.Hour)
+	paidDate4 := dueDate4.Add(5 * 24 * time.Hour) // 5 days late but fully paid
+	_, err = CreatePayment(db, ln.ID, 4, 300.00, 300.00, dueDate4, paidDate4)
+	if err != nil {
+		t.Fatalf("CreatePayment 4 failed: %v", err)
+	}
+
+	// Payment 5: Another unpaid payment
+	dueDate5 := dateTaken.Add(150 * 24 * time.Hour)
+	expectedPayment5, err := CreatePayment(db, ln.ID, 5, 300.00, 0.00, dueDate5, time.Time{})
+	if err != nil {
+		t.Fatalf("CreatePayment 5 failed: %v", err)
+	}
+
+	expectedUnpaidPayments := []payment{expectedPayment2, expectedPayment3, expectedPayment5}
+
+	// Act
+	actualUnpaidPayments, err := GetUnpaidPaymentsByLoanID(db, ln.ID)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("GetUnpaidPaymentsByLoanID failed: %v", err)
+	}
+
+	require.Equal(t, len(expectedUnpaidPayments), len(actualUnpaidPayments), "Should have exactly 3 unpaid payments")
+
+	require.Equal(t, expectedUnpaidPayments, actualUnpaidPayments, "Unpaid payments should match expected and be ordered by payment_number")
+}
+
+func TestGetUnpaidPaymentsByLoanID_NoUnpaidPayments(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// Arrange
+	usr, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Creating a loan for the test user
+	ln, err := CreateLoan(db, usr.ID, 5000.00, 0.04, 12, 10, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	// Create only fully paid payments
+	dueDate1 := dateTaken.Add(30 * 24 * time.Hour)
+	paidDate1 := dueDate1.Add(-5 * 24 * time.Hour)
+	_, err = CreatePayment(db, ln.ID, 1, 450.00, 450.00, dueDate1, paidDate1)
+	if err != nil {
+		t.Fatalf("CreatePayment 1 failed: %v", err)
+	}
+
+	dueDate2 := dateTaken.Add(60 * 24 * time.Hour)
+	paidDate2 := dueDate2.Add(-3 * 24 * time.Hour)
+	_, err = CreatePayment(db, ln.ID, 2, 450.00, 450.00, dueDate2, paidDate2)
+	if err != nil {
+		t.Fatalf("CreatePayment 2 failed: %v", err)
+	}
+
+	// Act
+	actualUnpaidPayments, err := GetUnpaidPaymentsByLoanID(db, ln.ID)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("GetUnpaidPaymentsByLoanID failed: %v", err)
+	}
+
+	require.Empty(t, actualUnpaidPayments, "Should return empty slice when all payments are fully paid")
+}
+
+func TestGetUnpaidPaymentsByLoanID_NonExistentLoan(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Act - Query for non-existent loan ID
+	actualUnpaidPayments, err := GetUnpaidPaymentsByLoanID(db, 99999)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("GetUnpaidPaymentsByLoanID failed: %v", err)
+	}
+
+	require.Empty(t, actualUnpaidPayments, "Should return empty slice for non-existent loan")
 }
 
 func TestDeletePayment(t *testing.T) {
