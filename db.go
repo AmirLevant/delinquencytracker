@@ -414,9 +414,21 @@ func GetLoansByStatus(db *sql.DB, status string) ([]loan, error) {
 }
 
 // CountLoansByStatus returns the count of loans with a specific status
-//func CountLoansByStatus(db *sql.DB, status string) (int64, error) {
-// ... implementation
-//}
+func CountLoansByStatus(db *sql.DB, status string) (int64, error) {
+	query := `
+	SELECT COUNT(*) 
+	FROM loans 
+	where status = $1`
+
+	var count int64
+
+	err := db.QueryRow(query, status).Scan(&count)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count, nil
+}
 
 // GetUnpaidPaymentsByLoanID retrieves all unpaid payments for a loan
 //func GetUnpaidPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {

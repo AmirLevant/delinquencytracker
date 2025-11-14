@@ -679,6 +679,71 @@ func TestGetLoansByStatus(t *testing.T) {
 
 }
 
+func TestCountLoansByStatus(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	usr1, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user1: %v", err)
+	}
+
+	usr2, err := CreateUser(db, "Test User", "loanuser2@test.com", "555-2222")
+	if err != nil {
+		t.Fatalf("Failed to create test user2: %v", err)
+	}
+
+	usr3, err := CreateUser(db, "User Third", "loanuser3@test.com", "555-3333")
+	if err != nil {
+		t.Fatalf("Failed to create test user3: %v", err)
+	}
+
+	_, err = CreateLoan(db, usr1.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	_, err = CreateLoan(db, usr2.ID, 20000.00, 0.25, 26, 15, "active", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	_, err = CreateLoan(db, usr3.ID, 30000.00, 0.35, 36, 25, "defaulted", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	var expectedCountActiveLoans = int64(2)
+	var expectedCountDefaultedLoans = int64(1)
+	var expectedCountPaidOffLoans = int64(0)
+
+	// Act
+
+	actualCountActiveLoans, err := CountLoansByStatus(db, "active")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by Active Status: %v", err)
+	}
+
+	require.Equal(t, expectedCountActiveLoans, actualCountActiveLoans)
+
+	actualDefaultedLoans, err := CountLoansByStatus(db, "defaulted")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by Defaulted Status: %v", err)
+	}
+
+	require.Equal(t, expectedCountDefaultedLoans, actualDefaultedLoans)
+
+	actualPaidOffLoans, err := CountLoansByStatus(db, "paid-off")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by paid-off Status: %v", err)
+	}
+	require.Equal(t, expectedCountPaidOffLoans, actualPaidOffLoans)
+
+}
+
 func TestDeleteLoan(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
