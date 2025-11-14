@@ -336,7 +336,7 @@ func GetAllLoans(db *sql.DB) ([]loan, error) {
 	}
 	defer rows.Close()
 
-	var loans []loan
+	loans := []loan{}
 
 	for rows.Next() {
 		var ln loan
@@ -382,7 +382,7 @@ func GetLoansByStatus(db *sql.DB, status string) ([]loan, error) {
 	}
 	defer rows.Close()
 
-	var loans []loan
+	loans := []loan{}
 
 	for rows.Next() {
 		var ln loan

@@ -653,7 +653,7 @@ func TestGetLoansByStatus(t *testing.T) {
 
 	var expectedActiveLoans = []loan{expectedln1, expectedln2}
 	var expectedDefaultedLoans = []loan{expectedln3}
-	//var expectedPaidOffLoans = []loan{}
+	var expectedPaidOffLoans = []loan{}
 
 	// Act
 
@@ -670,6 +670,12 @@ func TestGetLoansByStatus(t *testing.T) {
 	}
 
 	require.Equal(t, expectedDefaultedLoans, actualDefaultedLoans)
+
+	actualPaidOffLoans, err := GetLoansByStatus(db, "paid-off")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by paid-off Status: %v", err)
+	}
+	require.Equal(t, expectedPaidOffLoans, actualPaidOffLoans)
 
 }
 
