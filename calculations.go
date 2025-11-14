@@ -2,7 +2,11 @@ package delinquencytracker
 
 import "time"
 
-// IsOverdue checks if a payment is past its due date and not fully paid
+// ============================================================================
+// PAYMENT METHODS - Current Status (for collections/reminders)
+// ============================================================================
+
+// IsOverdue checks if payment is currently past due and not fully paid
 func (p *payment) IsOverdue() bool {
 	now := time.Now().UTC()
 	return now.After(p.DueDate) && !p.IsFullyPaid()
@@ -41,4 +45,29 @@ func (p *payment) IsPartiallyPaid() bool {
 // IsPaid checks if any payment has been recorded (even partial)
 func (p *payment) IsPaid() bool {
 	return p.AmountPaid > 0
+}
+
+// ============================================================================
+// PAYMENT METHODS - Historical Analysis (for credit scoring/reporting)
+// ============================================================================
+
+// WasPaidLate checks if the payment was made after its due date
+// Returns false if payment hasn't been made yet
+func (p *payment) WasPaidLate() bool {
+	// If never paid, not applicable
+	if p.PaidDate.IsZero() {
+		return false
+	}
+	// Check if paid after due date
+	return p.PaidDate.After(p.DueDate)
+}
+
+// DaysLate calculates how many days late the payment was made
+// Returns 0 if paid on time or not yet paid
+func (p *payment) DaysLate() int {
+	if !p.WasPaidLate() {
+		return 0
+	}
+	duration := p.PaidDate.Sub(p.DueDate)
+	return int(duration.Hours() / 24)
 }

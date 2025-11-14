@@ -12,14 +12,3 @@ type payment struct {
 	PaidDate      time.Time // when was this payment actually made (nil if unpaid)
 	CreatedAt     time.Time // when was this record created
 }
-
-// method to check if the payment is late
-// true means late, false means not late
-func (p payment) CheckLate() bool {
-	// If payment hasn't been made yet (PaidDate is zero), check if we're past due date
-	if p.PaidDate.IsZero() {
-		return time.Now().After(p.DueDate) // Late if current time is after due date
-	}
-	// If payment was made, check if it was made after the due date
-	return p.PaidDate.After(p.DueDate)
-}
