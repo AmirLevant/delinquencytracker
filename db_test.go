@@ -630,10 +630,10 @@ func TestGetLoansByStatus(t *testing.T) {
 		t.Fatalf("Failed to create test user2: %v", err)
 	}
 
-	//usr3, err := CreateUser(db, "User Third", "loanuser3@test.com", "555-3333")
-	//if err != nil {
-	//	t.Fatalf("Failed to create test user3: %v", err)
-	//}
+	usr3, err := CreateUser(db, "User Third", "loanuser3@test.com", "555-3333")
+	if err != nil {
+		t.Fatalf("Failed to create test user3: %v", err)
+	}
 
 	expectedln1, err := CreateLoan(db, usr1.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
 	if err != nil {
@@ -646,13 +646,13 @@ func TestGetLoansByStatus(t *testing.T) {
 		t.Fatalf("CreateLoan failed: %v", err)
 	}
 
-	//expectedln3, err := CreateLoan(db, usr3.ID, 30000.00, 0.35, 36, 25, "defaulted", dateTaken)
-	//if err != nil {
-	//	t.Fatalf("CreateLoan failed: %v", err)
-	//}
+	expectedln3, err := CreateLoan(db, usr3.ID, 30000.00, 0.35, 36, 25, "defaulted", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
 
 	var expectedActiveLoans = []loan{expectedln1, expectedln2}
-	//var expectedDefaultedLoans = []loan{expectedln3}
+	var expectedDefaultedLoans = []loan{expectedln3}
 	//var expectedPaidOffLoans = []loan{}
 
 	// Act
@@ -663,6 +663,13 @@ func TestGetLoansByStatus(t *testing.T) {
 	}
 
 	require.Equal(t, expectedActiveLoans, actualActiveLoans)
+
+	actualDefaultedLoans, err := GetLoansByStatus(db, "defaulted")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by Defaulted Status: %v", err)
+	}
+
+	require.Equal(t, expectedDefaultedLoans, actualDefaultedLoans)
 
 }
 
