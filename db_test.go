@@ -613,6 +613,59 @@ func TestGetAllLoans(t *testing.T) {
 
 }
 
+func TestGetLoansByStatus(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange, creating a multiple test users
+	dateTaken := time.Now().UTC().Truncate(24 * time.Hour)
+
+	usr1, err := CreateUser(db, "Loan User", "loanuser@test.com", "555-1234")
+	if err != nil {
+		t.Fatalf("Failed to create test user1: %v", err)
+	}
+
+	usr2, err := CreateUser(db, "Test User", "loanuser2@test.com", "555-2222")
+	if err != nil {
+		t.Fatalf("Failed to create test user2: %v", err)
+	}
+
+	//usr3, err := CreateUser(db, "User Third", "loanuser3@test.com", "555-3333")
+	//if err != nil {
+	//	t.Fatalf("Failed to create test user3: %v", err)
+	//}
+
+	expectedln1, err := CreateLoan(db, usr1.ID, 10000.00, 0.05, 16, 05, "active", dateTaken)
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	expectedln2, err := CreateLoan(db, usr2.ID, 20000.00, 0.25, 26, 15, "active", dateTaken)
+
+	if err != nil {
+		t.Fatalf("CreateLoan failed: %v", err)
+	}
+
+	//expectedln3, err := CreateLoan(db, usr3.ID, 30000.00, 0.35, 36, 25, "defaulted", dateTaken)
+	//if err != nil {
+	//	t.Fatalf("CreateLoan failed: %v", err)
+	//}
+
+	var expectedActiveLoans = []loan{expectedln1, expectedln2}
+	//var expectedDefaultedLoans = []loan{expectedln3}
+	//var expectedPaidOffLoans = []loan{}
+
+	// Act
+
+	actualActiveLoans, err := GetLoansByStatus(db, "active")
+	if err != nil {
+		t.Fatalf("Failed to get Loans by Active Status: %v", err)
+	}
+
+	require.Equal(t, expectedActiveLoans, actualActiveLoans)
+
+}
+
 func TestDeleteLoan(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)

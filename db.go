@@ -368,6 +368,61 @@ func GetAllLoans(db *sql.DB) ([]loan, error) {
 	return loans, nil
 }
 
+// GetLoansByStatus retrieves all loans with a specific status
+func GetLoansByStatus(db *sql.DB, status string) ([]loan, error) {
+	query := `
+	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at 
+	FROM loans
+	where status = $1
+	ORDER BY id
+	`
+	rows, err := db.Query(query, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var loans []loan
+
+	for rows.Next() {
+		var ln loan
+
+		err := rows.Scan(
+			&ln.ID,
+			&ln.UserID,
+			&ln.TotalAmount,
+			&ln.InterestRate,
+			&ln.TermMonths,
+			&ln.DayDue,
+			&ln.Status,
+			&ln.DateTaken,
+			&ln.CreatedAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+		ln.DateTaken = ln.DateTaken.UTC()
+		ln.CreatedAt = ln.CreatedAt.UTC()
+
+		loans = append(loans, ln)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return loans, nil
+}
+
+// CountLoansByStatus returns the count of loans with a specific status
+//func CountLoansByStatus(db *sql.DB, status string) (int64, error) {
+// ... implementation
+//}
+
+// GetUnpaidPaymentsByLoanID retrieves all unpaid payments for a loan
+//func GetUnpaidPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
+// ... implementation
+//}
+
 func DeleteLoan(db *sql.DB, LoanID int64) error {
 	query :=
 		`
