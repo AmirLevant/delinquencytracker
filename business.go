@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// calculateMonthlyPayment calculates the monthly payment using the amortization formula.
+// calculateMonthlyPayment calculates the monthly Payment using the amortization formula.
 func calculateMonthlyPayment(principal, annualRate float64, months int) float64 {
 	var mnthlyPayment float64
 	var mnthlyInterestRate float64 = annualRate / 12
@@ -25,7 +25,7 @@ func calculateMonthlyPayment(principal, annualRate float64, months int) float64 
 	return mnthlyPayment
 }
 
-// calculateDueDate calculates the payment due date by adding months to the start date.
+// calculateDueDate calculates the Payment due date by adding months to the start date.
 func calculateDueDate(startDate time.Time, termMonths, dayDue int) time.Time {
 	// Get the target month by adding months to the start date's year and month
 	// We need to work with year and month directly to avoid day overflow issues
@@ -54,166 +54,166 @@ func calculateDueDate(startDate time.Time, termMonths, dayDue int) time.Time {
 	return time.Date(year, month, actualDay, 0, 0, 0, 0, time.UTC)
 }
 
-// InitializeUserWithLoan creates a new user with a loan and generates the complete payment schedule.
+// InitializeUserWithLoan creates a new User with a Loan and generates the complete Payment schedule.
 // Use dateTaken to backdate loans for historical data.
-func InitializeUserWithLoan(db *sql.DB, name, email, phone string, totalAmount, interestRate float64, termMonths, dayDue int, dateTaken time.Time) (user, error) {
+func InitializeUserWithLoan(db *sql.DB, name, email, phone string, totalAmount, interestRate float64, termMonths, dayDue int, dateTaken time.Time) (User, error) {
 
 	// Ensure dateTaken is in UTC for consistency
 	dateTaken = dateTaken.UTC()
 
-	// Step 1: Create the user
-	// This gives us a user ID that we'll need for the loan
+	// Step 1: Create the User
+	// This gives us a User ID that we'll need for the Loan
 	usr, err := CreateUser(db, name, email, phone)
 	if err != nil {
-		return user{}, fmt.Errorf("failed to create user: %w", err)
+		return User{}, fmt.Errorf("failed to create User: %w", err)
 	}
 
-	// Step 2: Create the loan
-	// The loan uses the provided dateTaken and starts in "active" status
+	// Step 2: Create the Loan
+	// The Loan uses the provided dateTaken and starts in "active" status
 	ln, err := CreateLoan(db, usr.ID, totalAmount, interestRate, termMonths, dayDue, "active", dateTaken)
 	if err != nil {
-		// NOTE: At this point, the user exists in the DB but the loan failed
+		// NOTE: At this point, the User exists in the DB but the Loan failed
 		// In Approach 1, we don't clean this up automatically
 		// You could add cleanup logic here if desired
-		return user{}, fmt.Errorf("failed to create loan for user %d: %w", usr.ID, err)
+		return User{}, fmt.Errorf("failed to create Loan for User %d: %w", usr.ID, err)
 	}
 
-	// Step 3: Calculate the monthly payment amount
+	// Step 3: Calculate the monthly Payment amount
 	monthlyPayment := calculateMonthlyPayment(totalAmount, interestRate, termMonths)
 
-	// Step 4: Create all payment records
-	// We'll create one payment record for each month of the loan term
-	payments := make([]payment, 0, termMonths)
+	// Step 4: Create all Payment records
+	// We'll create one Payment record for each month of the Loan term
+	payments := make([]Payment, 0, termMonths)
 
 	for i := 1; i <= termMonths; i++ {
-		// Calculate when this payment is due
+		// Calculate when this Payment is due
 		dueDate := calculateDueDate(dateTaken, i, dayDue)
 
-		// Create the payment record
+		// Create the Payment record
 		// AmountPaid is 0 because it hasn't been paid yet
 		// PaidDate is zero time (time.Time{}) because it's unpaid
 		pmt, err := CreatePayment(db, ln.ID, int64(i), monthlyPayment, 0, dueDate, time.Time{})
 		if err != nil {
-			// NOTE: At this point, we have user + loan + some payments in DB
+			// NOTE: At this point, we have User + Loan + some payments in DB
 			// The remaining payments failed to create
 			// In Approach 1, we don't clean this up automatically
-			return user{}, fmt.Errorf("failed to create payment %d for loan %d: %w", i, ln.ID, err)
+			return User{}, fmt.Errorf("failed to create Payment %d for Loan %d: %w", i, ln.ID, err)
 		}
 
 		payments = append(payments, pmt)
 	}
 
-	// Step 5: Assemble the full user object
-	// Attach the payments to the loan
+	// Step 5: Assemble the full User object
+	// Attach the payments to the Loan
 	ln.Payments = payments
 
-	// Attach the loan to the user
-	usr.Loans = []loan{ln}
+	// Attach the Loan to the User
+	usr.Loans = []Loan{ln}
 
-	// Step 6: Return the fully populated user
+	// Step 6: Return the fully populated User
 	return usr, nil
 }
 
-// InitializeUserWithLoanNow creates a new user with a loan starting today.
+// InitializeUserWithLoanNow creates a new User with a Loan starting today.
 func InitializeUserWithLoanNow(db *sql.DB, name, email, phone string,
-	totalAmount, interestRate float64, termMonths, dayDue int) (user, error) {
+	totalAmount, interestRate float64, termMonths, dayDue int) (User, error) {
 	return InitializeUserWithLoan(db, name, email, phone, totalAmount, interestRate,
 		termMonths, dayDue, time.Now().UTC())
 }
 
-// AddLoanToExistingUser adds a new loan with payment schedule to an existing user.
+// AddLoanToExistingUser adds a new Loan with Payment schedule to an existing User.
 func AddLoanToExistingUser(db *sql.DB, userID int64, totalAmount, interestRate float64,
-	termMonths, dayDue int, dateTaken time.Time) (loan, error) {
+	termMonths, dayDue int, dateTaken time.Time) (Loan, error) {
 
 	// Ensure dateTaken is in UTC for consistency
 	dateTaken = dateTaken.UTC()
 
-	// Verify user exists
+	// Verify User exists
 	_, err := GetUserByID(db, userID)
 	if err != nil {
-		return loan{}, fmt.Errorf("user %d not found: %w", userID, err)
+		return Loan{}, fmt.Errorf("User %d not found: %w", userID, err)
 	}
 
-	// Create the loan
+	// Create the Loan
 	ln, err := CreateLoan(db, userID, totalAmount, interestRate, termMonths, dayDue, "active", dateTaken)
 	if err != nil {
-		return loan{}, fmt.Errorf("failed to create loan for user %d: %w", userID, err)
+		return Loan{}, fmt.Errorf("failed to create Loan for User %d: %w", userID, err)
 	}
 
-	// Calculate the monthly payment amount
+	// Calculate the monthly Payment amount
 	monthlyPayment := calculateMonthlyPayment(totalAmount, interestRate, termMonths)
 
-	// Create all payment records
-	payments := make([]payment, 0, termMonths)
+	// Create all Payment records
+	payments := make([]Payment, 0, termMonths)
 
 	for i := 1; i <= termMonths; i++ {
 		dueDate := calculateDueDate(dateTaken, i, dayDue)
 
 		pmt, err := CreatePayment(db, ln.ID, int64(i), monthlyPayment, 0, dueDate, time.Time{})
 		if err != nil {
-			return loan{}, fmt.Errorf("failed to create payment %d for loan %d: %w", i, ln.ID, err)
+			return Loan{}, fmt.Errorf("failed to create Payment %d for Loan %d: %w", i, ln.ID, err)
 		}
 
 		payments = append(payments, pmt)
 	}
 
-	// Attach payments to the loan
+	// Attach payments to the Loan
 	ln.Payments = payments
 
 	return ln, nil
 }
 
-// AddLoanToExistingUserNow adds a loan starting today to an existing user.
+// AddLoanToExistingUserNow adds a Loan starting today to an existing User.
 func AddLoanToExistingUserNow(db *sql.DB, userID int64, totalAmount, interestRate float64,
-	termMonths, dayDue int) (loan, error) {
+	termMonths, dayDue int) (Loan, error) {
 	return AddLoanToExistingUser(db, userID, totalAmount, interestRate,
 		termMonths, dayDue, time.Now().UTC())
 }
 
-// GetFullUserByID retrieves a user with all their loans and payments.
-func GetFullUserByID(db *sql.DB, userID int64) (user, error) {
-	// Step 1: Get the basic user information
+// GetFullUserByID retrieves a User with all their loans and payments.
+func GetFullUserByID(db *sql.DB, userID int64) (User, error) {
+	// Step 1: Get the basic User information
 	usr, err := GetUserByID(db, userID)
 	if err != nil {
-		return user{}, fmt.Errorf("failed to get user: %w", err)
+		return User{}, fmt.Errorf("failed to get User: %w", err)
 	}
 
-	// Step 2: Get all loans for this user
+	// Step 2: Get all loans for this User
 	loans, err := GetLoansByUserID(db, userID)
 	if err != nil {
-		return user{}, fmt.Errorf("failed to get loans for user %d: %w", userID, err)
+		return User{}, fmt.Errorf("failed to get loans for User %d: %w", userID, err)
 	}
 
-	// Step 3: For each loan, get all its payments
+	// Step 3: For each Loan, get all its payments
 	for i := range loans {
 		payments, err := GetPaymentsByLoanID(db, loans[i].ID)
 		if err != nil {
-			return user{}, fmt.Errorf("failed to get payments for loan %d: %w", loans[i].ID, err)
+			return User{}, fmt.Errorf("failed to get payments for Loan %d: %w", loans[i].ID, err)
 		}
 		loans[i].Payments = payments
 	}
 
-	// Step 4: Attach all loans to the user
+	// Step 4: Attach all loans to the User
 	usr.Loans = loans
 
 	return usr, nil
 }
 
-// GetFullLoanByID retrieves a loan with all its payment information.
-func GetFullLoanByID(db *sql.DB, loanID int64) (loan, error) {
-	// Step 1: Get the basic loan information
+// GetFullLoanByID retrieves a Loan with all its Payment information.
+func GetFullLoanByID(db *sql.DB, loanID int64) (Loan, error) {
+	// Step 1: Get the basic Loan information
 	ln, err := GetLoanByLoanID(db, loanID)
 	if err != nil {
-		return loan{}, fmt.Errorf("failed to get loan: %w", err)
+		return Loan{}, fmt.Errorf("failed to get Loan: %w", err)
 	}
 
-	// Step 2: Get all payments for this loan
+	// Step 2: Get all payments for this Loan
 	payments, err := GetPaymentsByLoanID(db, loanID)
 	if err != nil {
-		return loan{}, fmt.Errorf("failed to get payments for loan %d: %w", loanID, err)
+		return Loan{}, fmt.Errorf("failed to get payments for Loan %d: %w", loanID, err)
 	}
 
-	// Step 3: Attach payments to the loan
+	// Step 3: Attach payments to the Loan
 	ln.Payments = payments
 
 	return ln, nil
