@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestCalculateMonthlyPayment verifies monthly payment calculations for various loan scenarios.
 func TestCalculateMonthlyPayment(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -38,7 +39,7 @@ func TestCalculateMonthlyPayment(t *testing.T) {
 			principal:   5000.0,
 			annualRate:  0.08,
 			months:      24,
-			expected:    226.14, // Changed from 226.15
+			expected:    226.14,
 			description: "$5,000 at 8% APR for 24 months",
 		},
 		{
@@ -46,7 +47,7 @@ func TestCalculateMonthlyPayment(t *testing.T) {
 			principal:   1000.0,
 			annualRate:  0.15,
 			months:      6,
-			expected:    174.03, // Changed from 172.55
+			expected:    174.03,
 			description: "$1,000 at 15% APR for 6 months",
 		},
 	}
@@ -69,6 +70,7 @@ func TestCalculateMonthlyPayment(t *testing.T) {
 	}
 }
 
+// TestCalculateMonthlyPaymentTotal verifies that total payments exceed principal due to interest.
 func TestCalculateMonthlyPaymentTotal(t *testing.T) {
 	// Arrange
 	principal := 10000.0
@@ -93,6 +95,7 @@ func TestCalculateMonthlyPaymentTotal(t *testing.T) {
 	require.Less(t, totalPaid, maxExpected, "Total paid seems too high")
 }
 
+// TestCalculateDueDate verifies due date calculations including edge cases.
 func TestCalculateDueDate(t *testing.T) {
 	startDate := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
 
@@ -128,7 +131,7 @@ func TestCalculateDueDate(t *testing.T) {
 			name:        "End of month edge case",
 			paymentNum:  1,
 			dayDue:      31,
-			expected:    time.Date(2024, 2, 29, 0, 0, 0, 0, time.UTC), // Feb 2024 is leap year
+			expected:    time.Date(2024, 2, 29, 0, 0, 0, 0, time.UTC),
 			description: "When dayDue is 31 but month only has 29 days",
 		},
 		{
@@ -156,10 +159,7 @@ func TestCalculateDueDate(t *testing.T) {
 	}
 }
 
-// ============================================================================
-// INTEGRATION TESTS (Database Required)
-// ============================================================================
-
+// TestInitializeUserWithLoan verifies creation of a user with loan and payment schedule.
 func TestInitializeUserWithLoan(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
@@ -225,6 +225,7 @@ func TestInitializeUserWithLoan(t *testing.T) {
 	t.Logf("✓ Successfully created user with loan and %d payments", termMonths)
 }
 
+// TestInitializeUserWithLoanNow verifies creation of a user with loan starting today.
 func TestInitializeUserWithLoanNow(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
@@ -252,6 +253,7 @@ func TestInitializeUserWithLoanNow(t *testing.T) {
 	t.Logf("✓ Successfully created user with current-date loan")
 }
 
+// TestAddLoanToExistingUser verifies adding a second loan to an existing user.
 func TestAddLoanToExistingUser(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
@@ -285,6 +287,7 @@ func TestAddLoanToExistingUser(t *testing.T) {
 	t.Logf("✓ Successfully added second loan to existing user")
 }
 
+// TestAddLoanToExistingUserNow verifies adding a loan starting today to an existing user.
 func TestAddLoanToExistingUserNow(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
@@ -311,6 +314,7 @@ func TestAddLoanToExistingUserNow(t *testing.T) {
 	t.Logf("✓ Successfully added second loan with current date")
 }
 
+// TestAddLoanToNonexistentUser verifies error handling when adding loan to nonexistent user.
 func TestAddLoanToNonexistentUser(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
@@ -330,6 +334,7 @@ func TestAddLoanToNonexistentUser(t *testing.T) {
 	t.Logf("✓ Correctly rejected loan for nonexistent user")
 }
 
+// TestGetFullUserByID verifies retrieval of user with all loans and payments.
 func TestGetFullUserByID(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
@@ -366,6 +371,7 @@ func TestGetFullUserByID(t *testing.T) {
 	t.Logf("✓ Successfully retrieved full user with %d loans", len(fullUser.Loans))
 }
 
+// TestGetFullLoanByID verifies retrieval of loan with all payment information.
 func TestGetFullLoanByID(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
@@ -399,13 +405,14 @@ func TestGetFullLoanByID(t *testing.T) {
 	t.Logf("✓ Successfully retrieved full loan with %d payments", len(fullLoan.Payments))
 }
 
+// TestInitializeUserWithLoanHistoricalDate verifies backdating loans with historical dates.
 func TestInitializeUserWithLoanHistoricalDate(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
 
 	// Arrange - Create loan that started 1 year ago on the 15th
 	oneYearAgo := time.Date(time.Now().Year()-1, time.Now().Month(), 15, 0, 0, 0, 0, time.UTC)
-	dayDue := 1 // Payments due on the 1st of each month
+	dayDue := 1
 
 	// Act
 	user, err := InitializeUserWithLoan(db, "Historical User", "history@example.com", "555-4444",
@@ -426,12 +433,13 @@ func TestInitializeUserWithLoanHistoricalDate(t *testing.T) {
 	t.Logf("✓ Successfully created loan with historical date from %s", oneYearAgo.Format("2006-01-02"))
 }
 
+// TestPaymentScheduleIntegrity verifies payment schedule handles month-end edge cases correctly.
 func TestPaymentScheduleIntegrity(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
 
 	// Arrange
-	dateTaken := time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC) // Start on Jan 31
+	dateTaken := time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC)
 	dayDue := 31
 
 	// Act
@@ -445,18 +453,15 @@ func TestPaymentScheduleIntegrity(t *testing.T) {
 	// Verify payment schedule handles month-end correctly
 	payments := user.Loans[0].Payments
 
-	// Feb should be 29 (2024 is leap year)
 	require.Equal(t, 29, payments[0].DueDate.Day(), "Feb payment should be on 29th")
-	// March should be 31
 	require.Equal(t, 31, payments[1].DueDate.Day(), "March payment should be on 31st")
-	// April should be 30
 	require.Equal(t, 30, payments[2].DueDate.Day(), "April payment should be on 30th")
-	// May should be 31
 	require.Equal(t, 31, payments[3].DueDate.Day(), "May payment should be on 31st")
 
 	t.Logf("✓ Payment schedule correctly handles month-end edge cases")
 }
 
+// TestZeroInterestLoan verifies calculation of loans with zero interest rate.
 func TestZeroInterestLoan(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
