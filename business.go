@@ -7,13 +7,7 @@ import (
 	"time"
 )
 
-// calculateMonthlyPayment calculates the monthly payment using the amortization formula
-// Formula: M = P * [r(1+r)^n] / [(1+r)^n - 1]
-// Where:
-//
-//	P = principal (total amount borrowed)
-//	r = monthly interest rate (annual rate / 12)
-//	n = number of payments (term in months)
+// calculateMonthlyPayment calculates the monthly payment using the amortization formula.
 func calculateMonthlyPayment(principal, annualRate float64, months int) float64 {
 	var mnthlyPayment float64
 	var mnthlyInterestRate float64 = annualRate / 12
@@ -31,8 +25,7 @@ func calculateMonthlyPayment(principal, annualRate float64, months int) float64 
 	return mnthlyPayment
 }
 
-// calculateDueDate calculates when a specific payment is due
-// It adds 'paymentNum' months to the start date and sets the day to 'dayDue'
+// calculateDueDate calculates the payment due date by adding months to the start date.
 func calculateDueDate(startDate time.Time, termMonths, dayDue int) time.Time {
 	// Get the target month by adding months to the start date's year and month
 	// We need to work with year and month directly to avoid day overflow issues
@@ -61,27 +54,8 @@ func calculateDueDate(startDate time.Time, termMonths, dayDue int) time.Time {
 	return time.Date(year, month, actualDay, 0, 0, 0, 0, time.UTC)
 }
 
-// InitializeUserWithLoan creates a new user, a loan, and all payment schedules in one operation
-// This is the main "business logic" function that calls multiple database operations
-//
-// Parameters:
-//   - db: database connection
-//   - name, email, phone: user information
-//   - totalAmount: how much money is being borrowed
-//   - interestRate: annual interest rate (e.g., 0.05 for 5%)
-//   - termMonths: how many months the loan lasts
-//   - dayDue: what day of the month payments are due (1-31)
-//   - dateTaken: when the loan was taken (allows backdating for historical data)
-//
-// Returns:
-//   - A fully populated user object with the loan and all payments
-//   - Any error that occurred during the process
-//
-// Example usage:
-//
-//	dateTaken := time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)
-//	user, err := InitializeUserWithLoan(db, "John Doe", "john@example.com", "555-1234", 10000.0, 0.05, 12, 15, dateTaken)
-//	// Creates user with a $10,000 loan at 5% APR for 12 months, due on the 15th, starting June 15, 2023
+// InitializeUserWithLoan creates a new user with a loan and generates the complete payment schedule.
+// Use dateTaken to backdate loans for historical data.
 func InitializeUserWithLoan(db *sql.DB, name, email, phone string, totalAmount, interestRate float64, termMonths, dayDue int, dateTaken time.Time) (user, error) {
 
 	// Ensure dateTaken is in UTC for consistency
@@ -140,39 +114,14 @@ func InitializeUserWithLoan(db *sql.DB, name, email, phone string, totalAmount, 
 	return usr, nil
 }
 
-// InitializeUserWithLoanNow is a convenience wrapper that creates a loan starting today
-// Creating new loans in real-time
-// For backdated loans, use InitializeUserWithLoan with a specific dateTaken
-//
-// Example usage:
-//
-//	user, err := InitializeUserWithLoanNow(db, "John Doe", "john@example.com", "555-1234", 10000.0, 0.05, 12, 15)
+// InitializeUserWithLoanNow creates a new user with a loan starting today.
 func InitializeUserWithLoanNow(db *sql.DB, name, email, phone string,
 	totalAmount, interestRate float64, termMonths, dayDue int) (user, error) {
 	return InitializeUserWithLoan(db, name, email, phone, totalAmount, interestRate,
 		termMonths, dayDue, time.Now().UTC())
 }
 
-// AddLoanToExistingUser adds a new loan with payment schedule to an existing user
-// Use this when a user is applying for an additional loan
-//
-// Parameters:
-//   - db: database connection
-//   - userID: the ID of the existing user
-//   - totalAmount: how much money is being borrowed
-//   - interestRate: annual interest rate (e.g., 0.05 for 5%)
-//   - termMonths: how many months the loan lasts
-//   - dayDue: what day of the month payments are due (1-31)
-//   - dateTaken: when the loan was taken
-//
-// Returns:
-//   - The newly created loan with all payments
-//   - Any error that occurred
-//
-// Example usage:
-//
-//	dateTaken := time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC)
-//	loan, err := AddLoanToExistingUser(db, 123, 5000.0, 0.06, 24, 10, dateTaken)
+// AddLoanToExistingUser adds a new loan with payment schedule to an existing user.
 func AddLoanToExistingUser(db *sql.DB, userID int64, totalAmount, interestRate float64,
 	termMonths, dayDue int, dateTaken time.Time) (loan, error) {
 
@@ -214,34 +163,14 @@ func AddLoanToExistingUser(db *sql.DB, userID int64, totalAmount, interestRate f
 	return ln, nil
 }
 
-// AddLoanToExistingUserNow is a convenience wrapper that adds a loan starting today
+// AddLoanToExistingUserNow adds a loan starting today to an existing user.
 func AddLoanToExistingUserNow(db *sql.DB, userID int64, totalAmount, interestRate float64,
 	termMonths, dayDue int) (loan, error) {
 	return AddLoanToExistingUser(db, userID, totalAmount, interestRate,
 		termMonths, dayDue, time.Now().UTC())
 }
 
-// GetFullUserByID retrieves a user with all their loans and associated payments
-// This is useful when you need to display complete user information
-//
-// Parameters:
-//   - db: database connection
-//   - userID: the ID of the user to retrieve
-//
-// Returns:
-//   - A fully populated user object with all loans and payments
-//   - Any error that occurred
-//
-// Example usage:
-//
-//	user, err := GetFullUserByID(db, 123)
-//	for _, loan := range user.Loans {
-//	    fmt.Printf("Loan #%d: $%.2f\n", loan.ID, loan.TotalAmount)
-//	    for _, pmt := range loan.Payments {
-//	        fmt.Printf("  Payment #%d: $%.2f due on %s\n",
-//	                   pmt.PaymentNumber, pmt.AmountDue, pmt.DueDate)
-//	    }
-//	}
+// GetFullUserByID retrieves a user with all their loans and payments.
 func GetFullUserByID(db *sql.DB, userID int64) (user, error) {
 	// Step 1: Get the basic user information
 	usr, err := GetUserByID(db, userID)
@@ -270,16 +199,7 @@ func GetFullUserByID(db *sql.DB, userID int64) (user, error) {
 	return usr, nil
 }
 
-// GetFullLoanByID retrieves a loan with all its payment information
-// Useful when you only need loan details without the full user object
-//
-// Parameters:
-//   - db: database connection
-//   - loanID: the ID of the loan to retrieve
-//
-// Returns:
-//   - A fully populated loan object with all payments
-//   - Any error that occurred
+// GetFullLoanByID retrieves a loan with all its payment information.
 func GetFullLoanByID(db *sql.DB, loanID int64) (loan, error) {
 	// Step 1: Get the basic loan information
 	ln, err := GetLoanByLoanID(db, loanID)
