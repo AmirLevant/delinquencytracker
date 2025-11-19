@@ -81,6 +81,7 @@ func PopulateTestUsersLoansPayments(db *sql.DB) error {
 		36,       // 36 months (3 years)
 		5,        // Payment due on the 5th of each month
 		date1,
+		true, // Auto-pay past-due payments
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create user 1: %w", err)
@@ -95,9 +96,10 @@ func PopulateTestUsersLoansPayments(db *sql.DB) error {
 		"555-0102",
 		250000.00, // $250,000 loan
 		0.035,     // 3.5% annual interest rate
-		360,       // 360 months (30 years)
+		12,        // 12 months (1 years)
 		1,         // Payment due on the 1st of each month
 		date2,
+		true, // Auto-pay past-due payments
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create user 2: %w", err)
@@ -112,9 +114,10 @@ func PopulateTestUsersLoansPayments(db *sql.DB) error {
 		"555-0103",
 		8000.00, // $8,000 loan
 		0.0899,  // 8.99% annual interest rate
-		24,      // 24 months (2 years)
+		6,       // 6 months (1/2 year)
 		15,      // Payment due on the 15th of each month
 		date3,
+		true, // Auto-pay past-due payments
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create user 3: %w", err)
@@ -129,9 +132,10 @@ func PopulateTestUsersLoansPayments(db *sql.DB) error {
 		"555-0104",
 		35000.00, // $35,000 loan
 		0.00,     // 0% interest (special case handled in code)
-		120,      // 120 months (10 years)
+		36,       // 36 months (3 years)
 		28,       // Payment due on the 28th of each month
 		date4,
+		true, // Auto-pay past-due payments
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create user 4: %w", err)
@@ -149,6 +153,7 @@ func PopulateTestUsersLoansPayments(db *sql.DB) error {
 		60,       // 60 months (5 years)
 		10,       // Payment due on the 10th of each month
 		date5,
+		true, // Auto-pay past-due payments
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create user 5: %w", err)
@@ -164,6 +169,7 @@ func PopulateTestUsersLoansPayments(db *sql.DB) error {
 		12,      // 12 months (1 year)
 		5,       // Payment due on the 5th
 		time.Date(2024, 9, 1, 0, 0, 0, 0, time.UTC),
+		true, // Auto-pay past-due payments
 	)
 	if err != nil {
 		return fmt.Errorf("failed to add second loan to user 1: %w", err)
