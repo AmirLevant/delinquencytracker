@@ -1,6 +1,7 @@
 package delinquencytracker
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -159,8 +160,8 @@ func TestCalculateDueDate(t *testing.T) {
 	}
 }
 
-// TestInitializeUserWithLoan verifies creation of a user with loan and payment schedule.
-func TestInitializeUserWithLoan(t *testing.T) {
+// TestInitializeUserWithLoanUnpaid verifies creation of a user with loan where payments are NOT auto-paid.
+func TestInitializeUserWithLoanUnpaid(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(db)
 
@@ -174,9 +175,9 @@ func TestInitializeUserWithLoan(t *testing.T) {
 	termMonths := 12
 	dayDue := 15
 
-	// Act
+	// Act - autoPayPastDue = false
 	user, err := InitializeUserWithLoan(db, name, email, phone,
-		totalAmount, interestRate, termMonths, dayDue, dateTaken)
+		totalAmount, interestRate, termMonths, dayDue, dateTaken, false)
 
 	// Assert
 	require.NoError(t, err, "InitializeUserWithLoan should not return error")
@@ -200,12 +201,13 @@ func TestInitializeUserWithLoan(t *testing.T) {
 	// Check payments were created
 	require.Len(t, loan.Payments, termMonths, "Should have payment for each month")
 
-	// Verify first payment
+	// Verify first payment - should be UNPAID since autoPayPastDue = false
 	firstPayment := loan.Payments[0]
 	require.Equal(t, int64(1), firstPayment.PaymentNumber, "First payment should be #1")
 	require.Equal(t, loan.ID, firstPayment.LoanID, "Payment should belong to loan")
 	require.Greater(t, firstPayment.AmountDue, 0.0, "Payment amount should be positive")
 	require.Equal(t, 0.0, firstPayment.AmountPaid, "Payment should be unpaid")
+	require.True(t, firstPayment.PaidDate.IsZero(), "PaidDate should be zero for unpaid payment")
 	expectedFirstDue := time.Date(2024, 2, 15, 0, 0, 0, 0, time.UTC)
 	require.Equal(t, expectedFirstDue, firstPayment.DueDate, "First payment due date should be correct")
 
@@ -222,7 +224,72 @@ func TestInitializeUserWithLoan(t *testing.T) {
 			"Payment %d should have same amount as first payment", i+1)
 	}
 
-	t.Logf("✓ Successfully created user with loan and %d payments", termMonths)
+	// Verify ALL payments are unpaid
+	for i, pmt := range loan.Payments {
+		require.Equal(t, 0.0, pmt.AmountPaid, "Payment %d should be unpaid", i+1)
+		require.True(t, pmt.PaidDate.IsZero(), "Payment %d should have zero PaidDate", i+1)
+	}
+
+	t.Logf("✓ Successfully created user with loan and %d unpaid payments", termMonths)
+}
+
+// TestInitializeUserWithLoanAutoPaid verifies creation of a user with historical loan where past payments are auto-paid.
+func TestInitializeUserWithLoanAutoPaid(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	// Arrange - Create loan that started 6 months ago
+	sixMonthsAgo := time.Now().UTC().AddDate(0, -6, 0)
+	// Normalize to first of month for predictable testing
+	dateTaken := time.Date(sixMonthsAgo.Year(), sixMonthsAgo.Month(), 1, 0, 0, 0, 0, time.UTC)
+
+	name := "Jane Smith"
+	email := "jane@example.com"
+	phone := "555-5678"
+	totalAmount := 10000.0
+	interestRate := 0.05
+	termMonths := 12
+	dayDue := 15
+
+	// Act - autoPayPastDue = true
+	user, err := InitializeUserWithLoan(db, name, email, phone,
+		totalAmount, interestRate, termMonths, dayDue, dateTaken, true)
+
+	// Assert
+	require.NoError(t, err, "InitializeUserWithLoan should not return error")
+	require.Len(t, user.Loans, 1, "User should have exactly 1 loan")
+	loan := user.Loans[0]
+	require.Len(t, loan.Payments, termMonths, "Should have payment for each month")
+
+	// Calculate monthly payment amount
+	monthlyPayment := calculateMonthlyPayment(totalAmount, interestRate, termMonths)
+
+	// Count how many payments should be paid (due dates in the past)
+	now := time.Now().UTC()
+	paidCount := 0
+	unpaidCount := 0
+
+	for i, pmt := range loan.Payments {
+		if pmt.DueDate.Before(now) {
+			// This payment is in the past - should be marked as paid
+			require.Equal(t, monthlyPayment, pmt.AmountPaid,
+				"Payment %d (due %s) should be paid", i+1, pmt.DueDate.Format("2006-01-02"))
+			require.Equal(t, pmt.DueDate, pmt.PaidDate,
+				"Payment %d PaidDate should equal DueDate for auto-paid", i+1)
+			paidCount++
+		} else {
+			// This payment is in the future - should be unpaid
+			require.Equal(t, 0.0, pmt.AmountPaid,
+				"Payment %d (due %s) should be unpaid", i+1, pmt.DueDate.Format("2006-01-02"))
+			require.True(t, pmt.PaidDate.IsZero(),
+				"Payment %d should have zero PaidDate", i+1)
+			unpaidCount++
+		}
+	}
+
+	t.Logf("✓ Successfully created user with loan: %d paid, %d unpaid payments", paidCount, unpaidCount)
+	require.Greater(t, paidCount, 0, "Should have at least some paid payments from 6 months ago")
+	require.Greater(t, unpaidCount, 0, "Should have at least some unpaid future payments")
 }
 
 // TestInitializeUserWithLoanNow verifies creation of a user with loan starting today.
@@ -231,9 +298,9 @@ func TestInitializeUserWithLoanNow(t *testing.T) {
 	defer teardownTestDB(db)
 
 	// Arrange
-	name := "Jane Smith"
-	email := "jane@example.com"
-	phone := "555-5678"
+	name := "Bob Johnson"
+	email := "bob@example.com"
+	phone := "555-9999"
 
 	// Act
 	user, err := InitializeUserWithLoanNow(db, name, email, phone,
@@ -250,6 +317,12 @@ func TestInitializeUserWithLoanNow(t *testing.T) {
 	timeDiff := now.Sub(user.Loans[0].DateTaken)
 	require.Less(t, timeDiff, time.Minute, "Loan should have started within last minute")
 
+	// All payments should be unpaid since loan just started
+	for i, pmt := range user.Loans[0].Payments {
+		require.Equal(t, 0.0, pmt.AmountPaid, "Payment %d should be unpaid for new loan", i+1)
+		require.True(t, pmt.PaidDate.IsZero(), "Payment %d should have zero PaidDate", i+1)
+	}
+
 	t.Logf("✓ Successfully created user with current-date loan")
 }
 
@@ -260,14 +333,14 @@ func TestAddLoanToExistingUser(t *testing.T) {
 
 	// Arrange - Create initial user with a loan
 	dateTaken1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	user, err := InitializeUserWithLoan(db, "Bob Johnson", "bob@example.com", "555-9999",
-		10000.0, 0.05, 12, 15, dateTaken1)
+	user, err := InitializeUserWithLoan(db, "Alice Cooper", "alice@example.com", "555-1111",
+		10000.0, 0.05, 12, 15, dateTaken1, false)
 	require.NoError(t, err, "Failed to create initial user")
 
 	// Act - Add second loan to same user
 	dateTaken2 := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 	secondLoan, err := AddLoanToExistingUser(db, user.ID,
-		5000.0, 0.055, 24, 20, dateTaken2)
+		5000.0, 0.055, 24, 20, dateTaken2, false)
 
 	// Assert
 	require.NoError(t, err, "AddLoanToExistingUser should not return error")
@@ -293,7 +366,7 @@ func TestAddLoanToExistingUserNow(t *testing.T) {
 	defer teardownTestDB(db)
 
 	// Arrange - Create initial user
-	user, err := InitializeUserWithLoanNow(db, "Alice Cooper", "alice@example.com", "555-1111",
+	user, err := InitializeUserWithLoanNow(db, "Charlie Brown", "charlie@example.com", "555-2222",
 		8000.0, 0.06, 18, 5)
 	require.NoError(t, err, "Failed to create initial user")
 
@@ -325,7 +398,7 @@ func TestAddLoanToNonexistentUser(t *testing.T) {
 
 	// Act
 	_, err := AddLoanToExistingUser(db, nonexistentUserID,
-		5000.0, 0.05, 12, 15, dateTaken)
+		5000.0, 0.05, 12, 15, dateTaken, false)
 
 	// Assert
 	require.Error(t, err, "Should return error for nonexistent user")
@@ -341,12 +414,12 @@ func TestGetFullUserByID(t *testing.T) {
 
 	// Arrange - Create user with multiple loans
 	dateTaken1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	user, err := InitializeUserWithLoan(db, "Charlie Brown", "charlie@example.com", "555-2222",
-		10000.0, 0.05, 12, 15, dateTaken1)
+	user, err := InitializeUserWithLoan(db, "Diana Prince", "diana@example.com", "555-3333",
+		10000.0, 0.05, 12, 15, dateTaken1, false)
 	require.NoError(t, err, "Failed to create user")
 
 	dateTaken2 := time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC)
-	_, err = AddLoanToExistingUser(db, user.ID, 5000.0, 0.06, 24, 20, dateTaken2)
+	_, err = AddLoanToExistingUser(db, user.ID, 5000.0, 0.06, 24, 20, dateTaken2, false)
 	require.NoError(t, err, "Failed to add second loan")
 
 	// Act
@@ -355,7 +428,7 @@ func TestGetFullUserByID(t *testing.T) {
 	// Assert
 	require.NoError(t, err, "GetFullUserByID should not return error")
 	require.Equal(t, user.ID, fullUser.ID, "User ID should match")
-	require.Equal(t, "Charlie Brown", fullUser.Name, "User name should match")
+	require.Equal(t, "Diana Prince", fullUser.Name, "User name should match")
 	require.Len(t, fullUser.Loans, 2, "User should have 2 loans")
 
 	// Verify first loan
@@ -378,8 +451,8 @@ func TestGetFullLoanByID(t *testing.T) {
 
 	// Arrange - Create user with loan
 	dateTaken := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	user, err := InitializeUserWithLoan(db, "Diana Prince", "diana@example.com", "555-3333",
-		15000.0, 0.055, 36, 10, dateTaken)
+	user, err := InitializeUserWithLoan(db, "Eve Adams", "eve@example.com", "555-4444",
+		15000.0, 0.055, 36, 10, dateTaken, false)
 	require.NoError(t, err, "Failed to create user")
 
 	loanID := user.Loans[0].ID
@@ -415,8 +488,8 @@ func TestInitializeUserWithLoanHistoricalDate(t *testing.T) {
 	dayDue := 1
 
 	// Act
-	user, err := InitializeUserWithLoan(db, "Historical User", "history@example.com", "555-4444",
-		20000.0, 0.06, 24, dayDue, oneYearAgo)
+	user, err := InitializeUserWithLoan(db, "Historical User", "history@example.com", "555-5555",
+		20000.0, 0.06, 24, dayDue, oneYearAgo, false)
 
 	// Assert
 	require.NoError(t, err, "Should create loan with historical date")
@@ -443,8 +516,8 @@ func TestPaymentScheduleIntegrity(t *testing.T) {
 	dayDue := 31
 
 	// Act
-	user, err := InitializeUserWithLoan(db, "Edge Case User", "edge@example.com", "555-5555",
-		6000.0, 0.05, 6, dayDue, dateTaken)
+	user, err := InitializeUserWithLoan(db, "Edge Case User", "edge@example.com", "555-6666",
+		6000.0, 0.05, 6, dayDue, dateTaken, false)
 
 	// Assert
 	require.NoError(t, err, "Should create loan with edge case date")
@@ -472,8 +545,8 @@ func TestZeroInterestLoan(t *testing.T) {
 	termMonths := 12
 
 	// Act
-	user, err := InitializeUserWithLoan(db, "Zero Interest User", "zero@example.com", "555-6666",
-		principal, 0.0, termMonths, 15, dateTaken)
+	user, err := InitializeUserWithLoan(db, "Zero Interest User", "zero@example.com", "555-7777",
+		principal, 0.0, termMonths, 15, dateTaken, false)
 
 	// Assert
 	require.NoError(t, err, "Should create zero interest loan")
@@ -493,4 +566,47 @@ func TestZeroInterestLoan(t *testing.T) {
 		"Total payments should equal principal for zero interest loan")
 
 	t.Logf("✓ Zero interest loan calculated correctly: $%.2f/month", actualMonthlyPayment)
+}
+
+// TestValidateLoanParameters verifies input validation.
+func TestValidateLoanParameters(t *testing.T) {
+	db := setupTestDB(t)
+	defer teardownTestDB(db)
+
+	tests := []struct {
+		name         string
+		totalAmount  float64
+		interestRate float64
+		termMonths   int
+		dayDue       int
+		shouldFail   bool
+	}{
+		{"Valid parameters", 10000.0, 0.05, 12, 15, false},
+		{"Zero total amount", 0.0, 0.05, 12, 15, true},
+		{"Negative total amount", -1000.0, 0.05, 12, 15, true},
+		{"Negative interest rate", 10000.0, -0.05, 12, 15, true},
+		{"Zero term months", 10000.0, 0.05, 0, 15, true},
+		{"Negative term months", 10000.0, 0.05, -12, 15, true},
+		{"Day due too low", 10000.0, 0.05, 12, 0, true},
+		{"Day due too high", 10000.0, 0.05, 12, 32, true},
+		{"Zero interest valid", 10000.0, 0.0, 12, 15, false},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dateTaken := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+			// Use unique email for each test case to avoid constraint violation
+			email := fmt.Sprintf("test%d@example.com", i)
+			_, err := InitializeUserWithLoan(db, "Test User", email, "555-0000",
+				tt.totalAmount, tt.interestRate, tt.termMonths, tt.dayDue, dateTaken, false)
+
+			if tt.shouldFail {
+				require.Error(t, err, "Should return validation error")
+				t.Logf("✓ Correctly rejected: %s", tt.name)
+			} else {
+				require.NoError(t, err, "Should not return error for valid parameters")
+				t.Logf("✓ Correctly accepted: %s", tt.name)
+			}
+		})
+	}
 }
