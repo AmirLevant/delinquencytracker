@@ -54,6 +54,71 @@ func calculateDueDate(startDate time.Time, termMonths, dayDue int) time.Time {
 	return time.Date(year, month, actualDay, 0, 0, 0, 0, time.UTC)
 }
 
+// validateLoanParameters validates the input parameters for creating a Loan.
+func validateLoanParameters(totalAmount, interestRate float64, termMonths, dayDue int, dateTaken time.Time) error {
+	if totalAmount <= 0 {
+		return fmt.Errorf("totalAmount must be positive, got %.2f", totalAmount)
+	}
+
+	if interestRate < 0 {
+		return fmt.Errorf("interestRate cannot be negative, got %.4f", interestRate)
+	}
+
+	if termMonths <= 0 {
+		return fmt.Errorf("termMonths must be positive, got %d", termMonths)
+	}
+
+	if dayDue < 1 || dayDue > 31 {
+		return fmt.Errorf("dayDue must be between 1 and 31, got %d", dayDue)
+	}
+
+	// Allow dateTaken to be in the past, present, or future
+	// Just ensure it's a valid time
+	if dateTaken.IsZero() {
+		return fmt.Errorf("dateTaken cannot be zero time")
+	}
+
+	return nil
+}
+
+// createPaymentSchedule generates the complete Payment schedule for a Loan.
+// If autoPayPastDue is true, payments with due dates before now will be marked as paid.
+// The paidDate for auto-paid payments will be set to the dueDate (assumes on-time payment).
+func createPaymentSchedule(db *sql.DB, loanID int64, principal, annualRate float64,
+	termMonths, dayDue int, dateTaken time.Time, autoPayPastDue bool) ([]Payment, error) {
+
+	monthlyPayment := calculateMonthlyPayment(principal, annualRate, termMonths)
+	payments := make([]Payment, 0, termMonths)
+	now := time.Now().UTC()
+
+	for i := 1; i <= termMonths; i++ {
+		dueDate := calculateDueDate(dateTaken, i, dayDue)
+
+		// Determine if this payment should be marked as paid
+		var amountPaid float64
+		var paidDate time.Time
+
+		if autoPayPastDue && dueDate.Before(now) {
+			// Payment is in the past - mark as paid with on-time payment
+			amountPaid = monthlyPayment
+			paidDate = dueDate
+		} else {
+			// Payment is in the future or we're not auto-paying - leave unpaid
+			amountPaid = 0
+			paidDate = time.Time{}
+		}
+
+		pmt, err := CreatePayment(db, loanID, int64(i), monthlyPayment, amountPaid, dueDate, paidDate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Payment %d: %w", i, err)
+		}
+
+		payments = append(payments, pmt)
+	}
+
+	return payments, nil
+}
+
 // InitializeUserWithLoan creates a new User with a Loan and generates the complete Payment schedule.
 // Use dateTaken to backdate loans for historical data.
 func InitializeUserWithLoan(db *sql.DB, name, email, phone string, totalAmount, interestRate float64, termMonths, dayDue int, dateTaken time.Time) (User, error) {
