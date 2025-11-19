@@ -8,9 +8,9 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// we pass db connection and the user information
-// we return the new user's ID and any error
-func CreateUser(db *sql.DB, name, email, phone string) (user, error) {
+// we pass db connection and the User information
+// we return the new User's ID and any error
+func CreateUser(db *sql.DB, name, email, phone string) (User, error) {
 	query := `
 	INSERT INTO users (name, email, phone)
 	VALUES ($1, $2, $3)
@@ -22,10 +22,10 @@ func CreateUser(db *sql.DB, name, email, phone string) (user, error) {
 
 	err := db.QueryRow(query, name, email, phone).Scan(&userID, &createdAt)
 	if err != nil {
-		return user{}, fmt.Errorf("failed to create user: %w", err)
+		return User{}, fmt.Errorf("failed to create User: %w", err)
 	}
 
-	usr := user{userID, name, email, phone, createdAt, nil}
+	usr := User{userID, name, email, phone, createdAt, nil}
 
 	return usr, nil
 }
@@ -39,20 +39,20 @@ func UpdateUser(db *sql.DB, userID int64, name, email, phone string) error {
 
 	_, err := db.Exec(query, name, email, phone, userID)
 	if err != nil {
-		return fmt.Errorf("failed to update user: %w", err)
+		return fmt.Errorf("failed to update User: %w", err)
 	}
 
 	return nil
 }
 
-func GetUserByID(db *sql.DB, userID int64) (user, error) {
+func GetUserByID(db *sql.DB, userID int64) (User, error) {
 	query := `
 	SELECT id, name, email, phone, created_at
 	FROM users
 	WHERE id = $1
 	`
 
-	usr := user{}
+	usr := User{}
 
 	err := db.QueryRow(query, userID).Scan(
 		&usr.ID,
@@ -63,23 +63,23 @@ func GetUserByID(db *sql.DB, userID int64) (user, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return user{}, fmt.Errorf("user with ID %d not found", userID)
+		return User{}, fmt.Errorf("User with ID %d not found", userID)
 	}
 	if err != nil {
-		return user{}, fmt.Errorf("failed to get user: %w", err)
+		return User{}, fmt.Errorf("failed to get User: %w", err)
 	}
 
 	return usr, nil
 }
 
-func GetUserByEmail(db *sql.DB, email string) (user, error) {
+func GetUserByEmail(db *sql.DB, email string) (User, error) {
 	query := `
 	SELECT id, name, email, phone, created_at
 	FROM users
 	WHERE email = $1
 	`
 
-	usr := user{}
+	usr := User{}
 
 	err := db.QueryRow(query, email).Scan(
 		&usr.ID,
@@ -90,23 +90,23 @@ func GetUserByEmail(db *sql.DB, email string) (user, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return user{}, fmt.Errorf("user with Email %s not found", email)
+		return User{}, fmt.Errorf("User with Email %s not found", email)
 	}
 	if err != nil {
-		return user{}, fmt.Errorf("failed to get user: %w", err)
+		return User{}, fmt.Errorf("failed to get User: %w", err)
 	}
 
 	return usr, nil
 }
 
-func GetUserByPhone(db *sql.DB, phone string) (user, error) {
+func GetUserByPhone(db *sql.DB, phone string) (User, error) {
 	query := `
 	SELECT id, name, email, phone, created_at
 	FROM users
 	WHERE phone = $1
 	`
 
-	usr := user{}
+	usr := User{}
 
 	err := db.QueryRow(query, phone).Scan(
 		&usr.ID,
@@ -117,16 +117,16 @@ func GetUserByPhone(db *sql.DB, phone string) (user, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return user{}, fmt.Errorf("user with phone %s not found", phone)
+		return User{}, fmt.Errorf("User with phone %s not found", phone)
 	}
 	if err != nil {
-		return user{}, fmt.Errorf("failed to get user: %w", err)
+		return User{}, fmt.Errorf("failed to get User: %w", err)
 	}
 
 	return usr, nil
 }
 
-func GetAllUsers(db *sql.DB) ([]user, error) {
+func GetAllUsers(db *sql.DB) ([]User, error) {
 	query :=
 		`
 	SELECT id, name, email, phone, created_at
@@ -139,10 +139,10 @@ func GetAllUsers(db *sql.DB) ([]user, error) {
 	}
 	defer rows.Close()
 
-	var users []user
+	var users []User
 
 	for rows.Next() {
-		var usr user
+		var usr User
 		err := rows.Scan(
 			&usr.ID,
 			&usr.Name,
@@ -185,14 +185,14 @@ func DeleteUser(db *sql.DB, userID int64) error {
 	_, err := db.Exec(query, userID)
 
 	if err != nil {
-		return fmt.Errorf("failed to delete user %w", err)
+		return fmt.Errorf("failed to delete User %w", err)
 	}
 
 	return nil
 
 }
 
-func CreateLoan(db *sql.DB, userID int64, totalAmount, interestRate float64, termMonths, dayDue int, status string, dateTaken time.Time) (loan, error) {
+func CreateLoan(db *sql.DB, userID int64, totalAmount, interestRate float64, termMonths, dayDue int, status string, dateTaken time.Time) (Loan, error) {
 	query := `
         INSERT INTO loans (user_id, total_amount, interest_rate, term_months, day_due, status, date_taken)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -203,10 +203,10 @@ func CreateLoan(db *sql.DB, userID int64, totalAmount, interestRate float64, ter
 
 	err := db.QueryRow(query, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken).Scan(&loanID, &createdAt)
 	if err != nil {
-		return loan{}, fmt.Errorf("failed to create loan: %w", err)
+		return Loan{}, fmt.Errorf("failed to create Loan: %w", err)
 	}
 
-	ln := loan{loanID, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken.UTC(), createdAt.UTC(), nil}
+	ln := Loan{loanID, userID, totalAmount, interestRate, termMonths, dayDue, status, dateTaken.UTC(), createdAt.UTC(), nil}
 	return ln, nil
 }
 
@@ -219,7 +219,7 @@ func UpdateLoan(db *sql.DB, loanID int64, totalAmount, interestRate float64, ter
 
 	result, err := db.Exec(query, totalAmount, interestRate, termMonths, dayDue, status, dateTaken, loanID)
 	if err != nil {
-		return fmt.Errorf("failed to update loan: %w", err)
+		return fmt.Errorf("failed to update Loan: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
@@ -228,21 +228,21 @@ func UpdateLoan(db *sql.DB, loanID int64, totalAmount, interestRate float64, ter
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("loan with ID %d not found", loanID)
+		return fmt.Errorf("Loan with ID %d not found", loanID)
 	}
 
 	return nil
 }
 
-// Get a singular loan based on it's ID
-func GetLoanByLoanID(db *sql.DB, loanID int64) (loan, error) {
+// Get a singular Loan based on it's ID
+func GetLoanByLoanID(db *sql.DB, loanID int64) (Loan, error) {
 	query := `
 	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
 	FROM loans
 	WHERE id = $1
 	`
 
-	var l loan
+	var l Loan
 
 	err := db.QueryRow(query, loanID).Scan(
 		&l.ID,
@@ -257,10 +257,10 @@ func GetLoanByLoanID(db *sql.DB, loanID int64) (loan, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return loan{}, fmt.Errorf("loan with ID %d not found", loanID)
+		return Loan{}, fmt.Errorf("Loan with ID %d not found", loanID)
 	}
 	if err != nil {
-		return loan{}, fmt.Errorf("failed to get loan: %w", err)
+		return Loan{}, fmt.Errorf("failed to get Loan: %w", err)
 	}
 
 	l.DateTaken = l.DateTaken.UTC()
@@ -269,8 +269,8 @@ func GetLoanByLoanID(db *sql.DB, loanID int64) (loan, error) {
 	return l, nil
 }
 
-// Get all loans associated to a user
-func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
+// Get all loans associated to a User
+func GetLoansByUserID(db *sql.DB, userID int64) ([]Loan, error) {
 	query :=
 		`
 	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
@@ -282,14 +282,14 @@ func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 	rows, err := db.Query(query, userID)
 
 	if err != nil {
-		return []loan{}, fmt.Errorf("failed to query loans for user %d: %w", userID, err)
+		return []Loan{}, fmt.Errorf("failed to query loans for User %d: %w", userID, err)
 	}
 	defer rows.Close()
 
-	var loans []loan
+	var loans []Loan
 
 	for rows.Next() {
-		var l loan
+		var l Loan
 
 		err := rows.Scan(
 			&l.ID,
@@ -304,7 +304,7 @@ func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 		)
 
 		if err != nil {
-			return []loan{}, fmt.Errorf("failed to scan loan row: %w", err)
+			return []Loan{}, fmt.Errorf("failed to scan Loan row: %w", err)
 		}
 
 		l.DateTaken = l.DateTaken.UTC()
@@ -314,7 +314,7 @@ func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 
 	// we must check if the loop exited normally or fell silently
 	if err = rows.Err(); err != nil {
-		return []loan{}, fmt.Errorf("error iterating loan rows: %w", err)
+		return []Loan{}, fmt.Errorf("error iterating Loan rows: %w", err)
 	}
 
 	return loans, nil
@@ -322,7 +322,7 @@ func GetLoansByUserID(db *sql.DB, userID int64) ([]loan, error) {
 }
 
 // Gets all the loans in the database
-func GetAllLoans(db *sql.DB) ([]loan, error) {
+func GetAllLoans(db *sql.DB) ([]Loan, error) {
 	query :=
 		`
 	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at
@@ -336,10 +336,10 @@ func GetAllLoans(db *sql.DB) ([]loan, error) {
 	}
 	defer rows.Close()
 
-	loans := []loan{}
+	loans := []Loan{}
 
 	for rows.Next() {
-		var ln loan
+		var ln Loan
 
 		err := rows.Scan(
 			&ln.ID,
@@ -369,7 +369,7 @@ func GetAllLoans(db *sql.DB) ([]loan, error) {
 }
 
 // GetLoansByStatus retrieves all loans with a specific status
-func GetLoansByStatus(db *sql.DB, status string) ([]loan, error) {
+func GetLoansByStatus(db *sql.DB, status string) ([]Loan, error) {
 	query := `
 	SELECT id, user_id, total_amount, interest_rate, term_months, day_due, status, date_taken, created_at 
 	FROM loans
@@ -382,10 +382,10 @@ func GetLoansByStatus(db *sql.DB, status string) ([]loan, error) {
 	}
 	defer rows.Close()
 
-	loans := []loan{}
+	loans := []Loan{}
 
 	for rows.Next() {
-		var ln loan
+		var ln Loan
 
 		err := rows.Scan(
 			&ln.ID,
@@ -440,13 +440,13 @@ func DeleteLoan(db *sql.DB, LoanID int64) error {
 	_, err := db.Exec(query, LoanID)
 
 	if err != nil {
-		return fmt.Errorf("failed to delete loan %w", err)
+		return fmt.Errorf("failed to delete Loan %w", err)
 	}
 
 	return nil
 }
 
-func CreatePayment(db *sql.DB, LoanID, payment_number int64, AmountDue, AmountPaid float64, DueDate, PaidDate time.Time) (payment, error) {
+func CreatePayment(db *sql.DB, LoanID, payment_number int64, AmountDue, AmountPaid float64, DueDate, PaidDate time.Time) (Payment, error) {
 	query :=
 		`
 	INSERT INTO payments (loan_id, payment_number, amount_due, amount_paid, due_date, paid_date)
@@ -459,10 +459,10 @@ func CreatePayment(db *sql.DB, LoanID, payment_number int64, AmountDue, AmountPa
 
 	err := db.QueryRow(query, LoanID, payment_number, AmountDue, AmountPaid, DueDate, PaidDate).Scan(&paymentID, &createdAt)
 	if err != nil {
-		return payment{}, fmt.Errorf("failed to create payment: %w", err)
+		return Payment{}, fmt.Errorf("failed to create Payment: %w", err)
 	}
 
-	pyment := payment{paymentID, LoanID, payment_number, AmountDue, AmountPaid, DueDate.UTC(), PaidDate.UTC(), createdAt.UTC()}
+	pyment := Payment{paymentID, LoanID, payment_number, AmountDue, AmountPaid, DueDate.UTC(), PaidDate.UTC(), createdAt.UTC()}
 	return pyment, nil
 }
 
@@ -476,7 +476,7 @@ func UpdatePayment(db *sql.DB, UserID, LoanID, payment_number int64, AmountDue, 
 
 	result, err := db.Exec(query, LoanID, payment_number, AmountDue, AmountPaid, DueDate, PaidDate, UserID)
 	if err != nil {
-		return fmt.Errorf("failed to update payment: %w", err)
+		return fmt.Errorf("failed to update Payment: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
@@ -485,21 +485,21 @@ func UpdatePayment(db *sql.DB, UserID, LoanID, payment_number int64, AmountDue, 
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("payment with ID %d not found", UserID)
+		return fmt.Errorf("Payment with ID %d not found", UserID)
 	}
 
 	return nil
 
 }
 
-func GetPaymentByID(db *sql.DB, paymentID int64) (payment, error) {
+func GetPaymentByID(db *sql.DB, paymentID int64) (Payment, error) {
 	query := `
         SELECT id, loan_id, payment_number, amount_due, amount_paid, due_date, paid_date, created_at
         FROM payments
         WHERE id = $1
     `
 
-	var p payment
+	var p Payment
 	err := db.QueryRow(query, paymentID).Scan(
 		&p.ID,
 		&p.LoanID,
@@ -515,14 +515,14 @@ func GetPaymentByID(db *sql.DB, paymentID int64) (payment, error) {
 	p.CreatedAt = p.CreatedAt.UTC()
 
 	if err != nil {
-		return payment{}, fmt.Errorf("failed to get payment: %w", err)
+		return Payment{}, fmt.Errorf("failed to get Payment: %w", err)
 	}
 
 	return p, nil
 }
 
-// Gets all the payments associated with a singular loan
-func GetPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
+// Gets all the payments associated with a singular Loan
+func GetPaymentsByLoanID(db *sql.DB, loanID int64) ([]Payment, error) {
 	query := `
 	SELECT id, loan_id, payment_number, amount_due, amount_paid, due_date, paid_date, created_at
 	FROM payments
@@ -532,14 +532,14 @@ func GetPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
 
 	rows, err := db.Query(query, loanID)
 	if err != nil {
-		return []payment{}, fmt.Errorf("failed to query payments for loan %d: %w", loanID, err)
+		return []Payment{}, fmt.Errorf("failed to query payments for Loan %d: %w", loanID, err)
 	}
 	defer rows.Close()
 
-	var payments []payment
+	var payments []Payment
 
 	for rows.Next() {
-		var p payment
+		var p Payment
 
 		err := rows.Scan(
 			&p.ID,
@@ -553,7 +553,7 @@ func GetPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
 		)
 
 		if err != nil {
-			return []payment{}, fmt.Errorf("failed to scan payment row: %w", err)
+			return []Payment{}, fmt.Errorf("failed to scan Payment row: %w", err)
 		}
 
 		p.DueDate = p.DueDate.UTC()
@@ -565,14 +565,14 @@ func GetPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
 
 	// we must check if the loop exited normally or fell silently
 	if err = rows.Err(); err != nil {
-		return []payment{}, fmt.Errorf("error iterating payment rows: %w", err)
+		return []Payment{}, fmt.Errorf("error iterating Payment rows: %w", err)
 	}
 
 	return payments, nil
 }
 
-// Gets all the payments in the database, regardless of loan
-func GetAllPayments(db *sql.DB) ([]payment, error) {
+// Gets all the payments in the database, regardless of Loan
+func GetAllPayments(db *sql.DB) ([]Payment, error) {
 	query :=
 		`
 	SELECT id, loan_id, payment_number, amount_due, amount_paid, due_date, paid_date, created_at
@@ -586,10 +586,10 @@ func GetAllPayments(db *sql.DB) ([]payment, error) {
 	}
 	defer rows.Close()
 
-	var payments []payment
+	var payments []Payment
 
 	for rows.Next() {
-		var p payment
+		var p Payment
 
 		err := rows.Scan(
 			&p.ID,
@@ -620,8 +620,8 @@ func GetAllPayments(db *sql.DB) ([]payment, error) {
 	return payments, nil
 }
 
-// GetUnpaidPaymentsByLoanID retrieves all unpaid payments for a loan
-func GetUnpaidPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
+// GetUnpaidPaymentsByLoanID retrieves all unpaid payments for a Loan
+func GetUnpaidPaymentsByLoanID(db *sql.DB, loanID int64) ([]Payment, error) {
 	query := `
 	SELECT id, loan_id, payment_number, amount_due, amount_paid, due_date, paid_date, created_at
 	FROM payments
@@ -632,14 +632,14 @@ func GetUnpaidPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
 
 	rows, err := db.Query(query, loanID)
 	if err != nil {
-		return []payment{}, fmt.Errorf("failed to query unpaid payments for loan %d: %w", loanID, err)
+		return []Payment{}, fmt.Errorf("failed to query unpaid payments for Loan %d: %w", loanID, err)
 	}
 	defer rows.Close()
 
-	var payments []payment
+	var payments []Payment
 
 	for rows.Next() {
-		var p payment
+		var p Payment
 
 		err := rows.Scan(
 			&p.ID,
@@ -653,7 +653,7 @@ func GetUnpaidPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
 		)
 
 		if err != nil {
-			return []payment{}, fmt.Errorf("failed to scan payment row: %w", err)
+			return []Payment{}, fmt.Errorf("failed to scan Payment row: %w", err)
 		}
 
 		p.DueDate = p.DueDate.UTC()
@@ -665,13 +665,13 @@ func GetUnpaidPaymentsByLoanID(db *sql.DB, loanID int64) ([]payment, error) {
 
 	// Check if the loop exited normally or fell silently
 	if err = rows.Err(); err != nil {
-		return []payment{}, fmt.Errorf("error iterating payment rows: %w", err)
+		return []Payment{}, fmt.Errorf("error iterating Payment rows: %w", err)
 	}
 
 	return payments, nil
 }
 
-// Deletes a singular payment based on a given ID
+// Deletes a singular Payment based on a given ID
 func DeletePayment(db *sql.DB, paymentID int64) error {
 	query :=
 		`
@@ -681,7 +681,7 @@ func DeletePayment(db *sql.DB, paymentID int64) error {
 	_, err := db.Exec(query, paymentID)
 
 	if err != nil {
-		return fmt.Errorf("failed to delete payment %w", err)
+		return fmt.Errorf("failed to delete Payment %w", err)
 	}
 
 	return nil

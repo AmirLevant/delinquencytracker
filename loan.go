@@ -2,7 +2,7 @@ package delinquencytracker
 
 import "time"
 
-type loan struct {
+type Loan struct {
 	ID           int64     // unique identifier for the loan
 	UserID       int64     // which user this loan belong to
 	TotalAmount  float64   // total amount of money borrowed
@@ -13,6 +13,6 @@ type loan struct {
 	DateTaken    time.Time // when was the loan taken
 	CreatedAt    time.Time // when was this record created
 
-	Payments []payment // all payments associated with this loan
+	Payments []Payment // all payments associated with this loan
 
 }
