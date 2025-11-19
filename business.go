@@ -121,118 +121,112 @@ func createPaymentSchedule(db *sql.DB, loanID int64, principal, annualRate float
 
 // InitializeUserWithLoan creates a new User with a Loan and generates the complete Payment schedule.
 // Use dateTaken to backdate loans for historical data.
-func InitializeUserWithLoan(db *sql.DB, name, email, phone string, totalAmount, interestRate float64, termMonths, dayDue int, dateTaken time.Time) (User, error) {
+// If autoPayPastDue is true, payments with due dates before today will be automatically marked as paid.
+func InitializeUserWithLoan(db *sql.DB, name, email, phone string, totalAmount, interestRate float64,
+	termMonths, dayDue int, dateTaken time.Time, autoPayPastDue bool) (User, error) {
 
 	// Ensure dateTaken is in UTC for consistency
 	dateTaken = dateTaken.UTC()
 
+	// Validate input parameters
+	if err := validateLoanParameters(totalAmount, interestRate, termMonths, dayDue, dateTaken); err != nil {
+		return User{}, fmt.Errorf("invalid loan parameters: %w", err)
+	}
+
 	// Step 1: Create the User
-	// This gives us a User ID that we'll need for the Loan
 	usr, err := CreateUser(db, name, email, phone)
 	if err != nil {
 		return User{}, fmt.Errorf("failed to create User: %w", err)
 	}
 
 	// Step 2: Create the Loan
-	// The Loan uses the provided dateTaken and starts in "active" status
 	ln, err := CreateLoan(db, usr.ID, totalAmount, interestRate, termMonths, dayDue, "active", dateTaken)
 	if err != nil {
-		// NOTE: At this point, the User exists in the DB but the Loan failed
-		// In Approach 1, we don't clean this up automatically
-		// You could add cleanup logic here if desired
 		return User{}, fmt.Errorf("failed to create Loan for User %d: %w", usr.ID, err)
 	}
 
-	// Step 3: Calculate the monthly Payment amount
-	monthlyPayment := calculateMonthlyPayment(totalAmount, interestRate, termMonths)
-
-	// Step 4: Create all Payment records
-	// We'll create one Payment record for each month of the Loan term
-	payments := make([]Payment, 0, termMonths)
-
-	for i := 1; i <= termMonths; i++ {
-		// Calculate when this Payment is due
-		dueDate := calculateDueDate(dateTaken, i, dayDue)
-
-		// Create the Payment record
-		// AmountPaid is 0 because it hasn't been paid yet
-		// PaidDate is zero time (time.Time{}) because it's unpaid
-		pmt, err := CreatePayment(db, ln.ID, int64(i), monthlyPayment, 0, dueDate, time.Time{})
-		if err != nil {
-			// NOTE: At this point, we have User + Loan + some payments in DB
-			// The remaining payments failed to create
-			// In Approach 1, we don't clean this up automatically
-			return User{}, fmt.Errorf("failed to create Payment %d for Loan %d: %w", i, ln.ID, err)
-		}
-
-		payments = append(payments, pmt)
+	// Step 3: Create all Payment records
+	payments, err := createPaymentSchedule(db, ln.ID, totalAmount, interestRate, termMonths, dayDue, dateTaken, autoPayPastDue)
+	if err != nil {
+		return User{}, fmt.Errorf("failed to create payment schedule for Loan %d: %w", ln.ID, err)
 	}
 
-	// Step 5: Assemble the full User object
-	// Attach the payments to the Loan
+	// Step 4: Assemble the full User object
 	ln.Payments = payments
-
-	// Attach the Loan to the User
 	usr.Loans = []Loan{ln}
 
-	// Step 6: Return the fully populated User
 	return usr, nil
 }
 
 // InitializeUserWithLoanNow creates a new User with a Loan starting today.
+// All past payments (none in this case) will not be auto-paid since the Loan starts now.
 func InitializeUserWithLoanNow(db *sql.DB, name, email, phone string,
 	totalAmount, interestRate float64, termMonths, dayDue int) (User, error) {
+	// When creating a loan starting now, there are no past payments to auto-pay
 	return InitializeUserWithLoan(db, name, email, phone, totalAmount, interestRate,
-		termMonths, dayDue, time.Now().UTC())
+		termMonths, dayDue, time.Now().UTC(), false)
+}
+
+// InitializeUserWithLoanNowAutoPay creates a new User with a Loan starting today.
+// This is primarily for testing or special cases where you might want autoPayPastDue enabled.
+func InitializeUserWithLoanNowAutoPay(db *sql.DB, name, email, phone string,
+	totalAmount, interestRate float64, termMonths, dayDue int, autoPayPastDue bool) (User, error) {
+	return InitializeUserWithLoan(db, name, email, phone, totalAmount, interestRate,
+		termMonths, dayDue, time.Now().UTC(), autoPayPastDue)
 }
 
 // AddLoanToExistingUser adds a new Loan with Payment schedule to an existing User.
+// If autoPayPastDue is true, payments with due dates before today will be automatically marked as paid.
 func AddLoanToExistingUser(db *sql.DB, userID int64, totalAmount, interestRate float64,
-	termMonths, dayDue int, dateTaken time.Time) (Loan, error) {
+	termMonths, dayDue int, dateTaken time.Time, autoPayPastDue bool) (Loan, error) {
 
 	// Ensure dateTaken is in UTC for consistency
 	dateTaken = dateTaken.UTC()
 
-	// Verify User exists
+	// Validate input parameters
+	if err := validateLoanParameters(totalAmount, interestRate, termMonths, dayDue, dateTaken); err != nil {
+		return Loan{}, fmt.Errorf("invalid loan parameters: %w", err)
+	}
+
+	// Step 1: Verify User exists
 	_, err := GetUserByID(db, userID)
 	if err != nil {
 		return Loan{}, fmt.Errorf("User %d not found: %w", userID, err)
 	}
 
-	// Create the Loan
+	// Step 2: Create the Loan
 	ln, err := CreateLoan(db, userID, totalAmount, interestRate, termMonths, dayDue, "active", dateTaken)
 	if err != nil {
 		return Loan{}, fmt.Errorf("failed to create Loan for User %d: %w", userID, err)
 	}
 
-	// Calculate the monthly Payment amount
-	monthlyPayment := calculateMonthlyPayment(totalAmount, interestRate, termMonths)
-
-	// Create all Payment records
-	payments := make([]Payment, 0, termMonths)
-
-	for i := 1; i <= termMonths; i++ {
-		dueDate := calculateDueDate(dateTaken, i, dayDue)
-
-		pmt, err := CreatePayment(db, ln.ID, int64(i), monthlyPayment, 0, dueDate, time.Time{})
-		if err != nil {
-			return Loan{}, fmt.Errorf("failed to create Payment %d for Loan %d: %w", i, ln.ID, err)
-		}
-
-		payments = append(payments, pmt)
+	// Step 3: Create all Payment records
+	payments, err := createPaymentSchedule(db, ln.ID, totalAmount, interestRate, termMonths, dayDue, dateTaken, autoPayPastDue)
+	if err != nil {
+		return Loan{}, fmt.Errorf("failed to create payment schedule for Loan %d: %w", ln.ID, err)
 	}
 
-	// Attach payments to the Loan
+	// Step 4: Attach payments to the Loan
 	ln.Payments = payments
 
 	return ln, nil
 }
 
 // AddLoanToExistingUserNow adds a Loan starting today to an existing User.
+// All past payments (none in this case) will not be auto-paid since the Loan starts now.
 func AddLoanToExistingUserNow(db *sql.DB, userID int64, totalAmount, interestRate float64,
 	termMonths, dayDue int) (Loan, error) {
+	// When creating a loan starting now, there are no past payments to auto-pay
 	return AddLoanToExistingUser(db, userID, totalAmount, interestRate,
-		termMonths, dayDue, time.Now().UTC())
+		termMonths, dayDue, time.Now().UTC(), false)
+}
+
+// AddLoanToExistingUserNowAutoPay adds a Loan starting today to an existing User.
+// This is primarily for testing or special cases where you might want autoPayPastDue enabled.
+func AddLoanToExistingUserNowAutoPay(db *sql.DB, userID int64, totalAmount, interestRate float64,
+	termMonths, dayDue int, autoPayPastDue bool) (Loan, error) {
+	return AddLoanToExistingUser(db, userID, totalAmount, interestRate,
+		termMonths, dayDue, time.Now().UTC(), autoPayPastDue)
 }
 
 // GetFullUserByID retrieves a User with all their loans and payments.
